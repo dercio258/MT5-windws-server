@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, DollarSign, LogOut, Menu, X, MessageSquare, Smartphone } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, DollarSign, LogOut, Menu, X, MessageSquare, Smartphone, Calendar } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export const AdminLayout = () => {
@@ -15,6 +15,7 @@ export const AdminLayout = () => {
 
     const navItems = [
         { path: '/admin/dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+        { path: '/admin/calendar', label: 'Calendário Econômico', icon: Calendar },
         { path: '/admin/users', label: 'Usuários', icon: Users },
         { path: '/admin/notifications', label: 'Notificações', icon: MessageSquare },
         { path: '/admin/whatsapp', label: 'WhatsApp Bot', icon: Smartphone },

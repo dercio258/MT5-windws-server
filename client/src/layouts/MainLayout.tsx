@@ -1,62 +1,59 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { ChatWidget } from '../components/network/ChatWidget';
 import { useAuth } from '../context/AuthContext';
 import { PlanRequiredOverlay } from '../components/subscription/PlanRequiredOverlay';
 import { OnboardingSurvey } from '../components/onboarding/OnboardingSurvey';
-import { Menu } from 'lucide-react';
+import { AccountManagerModal } from '../components/account/AccountManagerModal';
+import { Header } from '../components/Header';
 
 export const MainLayout = () => {
     const { user, isLoading } = useAuth();
     const location = useLocation();
-    const isPaymentsPage = location.pathname === '/payments';
+    const isPaymentsPage = location.pathname === '/payments' || location.pathname === '/pricing';
     const hasNoPlan = user && (!user.tier || user.tier === 'FREE') && !isPaymentsPage;
     const showOnboarding = user && user.onboardingCompleted === false;
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     if (isLoading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-slate-950">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-[#08090C]">
+                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
 
+    // Se o usuário já utilizou o período de teste e não possui plano ativo, redirecionar para a página de preços
+    if (hasNoPlan && user?.hasUsedTrial && location.pathname !== '/pricing' && location.pathname !== '/payments') {
+        return <Navigate to="/pricing" replace />;
+    }
+
     return (
-        <div className="flex h-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
+        <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#08090C] font-sans text-slate-900 dark:text-[#F3F4F6] transition-colors duration-200 selection:bg-emerald-500/20">
             {hasNoPlan && <PlanRequiredOverlay />}
             {showOnboarding && <OnboardingSurvey onComplete={() => {}} />}
+            <AccountManagerModal />
 
-            {/* Mobile Header */}
-            <div className="md:hidden fixed top-0 left-0 w-full h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-40">
-                <div className="flex items-center gap-2">
-                    <img src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png" alt="Logo" className="w-6 h-6 object-contain" />
-                    <span className="font-bold text-lg tracking-tight text-slate-100">
-                        TOREX <span className="text-emerald-400">JOURNAL</span>
-                    </span>
-                </div>
-                <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg">
-                    <Menu size={24} />
-                </button>
-            </div>
-
-            {/* Backdrop */}
+            {/* Backdrop for mobile drawer */}
             {isSidebarOpen && (
-                <div className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setIsSidebarOpen(false)} />
+                <div className="md:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setIsSidebarOpen(false)} />
             )}
 
             {/* Sidebar Wrapper (fixed drawer on mobile, static sidebar on desktop) */}
-            <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:static md:translate-x-0 transition-transform duration-300 ease-in-out z-50 h-full shrink-0`}>
+            <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:static md:translate-x-0 md:transform-none transition-transform duration-300 ease-in-out z-50 h-full shrink-0`}>
                 <Sidebar onClose={() => setIsSidebarOpen(false)} />
             </div>
 
-            <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative pt-16 md:pt-0">
-                {/* Background Gradients */}
-                <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-900/10 to-transparent pointer-events-none" />
+            <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+                {/* Fixed, Robust Header Aligned with Sidebar */}
+                <Header onOpenSidebar={() => setIsSidebarOpen(true)} />
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth z-0">
-                    <div className="max-w-7xl mx-auto space-y-6">
+                {/* Subtle Ambient Glow */}
+                <div className="absolute top-0 left-0 w-full h-80 bg-gradient-to-b from-emerald-500/[0.03] to-transparent pointer-events-none" />
+
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 scroll-smooth z-0">
+                    <div className="w-full max-w-[1680px] mx-auto space-y-5">
                         {hasNoPlan ? null : <Outlet />}
                     </div>
                 </div>

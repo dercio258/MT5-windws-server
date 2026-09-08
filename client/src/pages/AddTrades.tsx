@@ -6,11 +6,13 @@ import { ManualImportForm } from '../components/dashboard/ManualImportForm';
 import { ImportHistory } from '../components/dashboard/ImportHistory';
 import { Copy, Terminal, Cloud, FileText, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAccount } from '../context/AccountContext';
 import api from '../api';
 import { PlanModal } from '../components/dashboard/PlanModal';
 
 export const AddTrades = () => {
     const { user } = useAuth();
+    const { selectedAccountId, selectedAccount, openManageModal } = useAccount();
     const [step, setStep] = useState<'SELECT' | 'CONNECT_MT_CLOUD' | 'CONNECT_MT_OPTIONS' | 'CONNECT_MT_EA' | 'CONNECT_DERIV' | 'CONNECT_MANUAL' | 'CONNECT_MANUAL_MT'>('SELECT');
     const [mtVersion] = useState<'4' | '5'>('5');
     // selectedBroker state removed as it is no longer used for rendering info
@@ -20,14 +22,26 @@ export const AddTrades = () => {
     useEffect(() => {
         const fetchToken = async () => {
             try {
-                const res = await api.get('/auth/app-token');
-                if (res.data?.token) setAppToken(res.data.token);
+                const params: any = {};
+                if (selectedAccountId) {
+                    params.accountId = selectedAccountId;
+                }
+                const res = await api.get('/auth/app-token', { params });
+                if (res.data?.token) {
+                    setAppToken(res.data.token);
+                    return;
+                }
             } catch (e) {
+                // Fallback to selectedAccount.appToken
+            }
+            if (selectedAccount?.appToken) {
+                setAppToken(selectedAccount.appToken);
+            } else {
                 setAppToken(user?.id ? `ea-${user.id.substring(0, 8)}` : 'Loading...');
             }
         };
         fetchToken();
-    }, [user]);
+    }, [user, selectedAccountId, selectedAccount]);
 
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [upgradeFeature, setUpgradeFeature] = useState('');
@@ -113,16 +127,40 @@ export const AddTrades = () => {
                                 <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
                                     <Terminal className="text-indigo-400" /> Auto-Importação via EA
                                 </h3>
-                                <p className="text-slate-400 mb-8">Use este token para conectar seu Expert Advisor (EA) no MetaTrader {mtVersion}.</p>
+                                <p className="text-slate-400 mb-6">Use este token para conectar seu Expert Advisor (EA) no MetaTrader {mtVersion}.</p>
+
+                                {/* Account Scoping Notice */}
+                                <div className="bg-indigo-950/40 border border-indigo-500/20 rounded-2xl p-4 mb-6 flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold block">
+                                            Conta de Destino do EA
+                                        </span>
+                                        <p className="text-sm font-bold text-slate-100 mt-0.5">
+                                            {selectedAccount?.name || 'Conta Principal'}
+                                            <span className="text-xs text-slate-400 font-normal ml-2">
+                                                ({selectedAccount?.broker || 'MetaTrader 5'} • {selectedAccount?.currency || 'USD'})
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => openManageModal('accounts')}
+                                        className="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium"
+                                    >
+                                        Trocar conta
+                                    </button>
+                                </div>
 
                                 <div className="bg-slate-950/80 rounded-2xl p-6 border border-indigo-500/20 mb-6 backdrop-blur-md">
-                                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wider block mb-2">Seu App Token</span>
+                                    <span className="text-sm text-slate-500 font-bold uppercase tracking-wider block mb-2">Token Exclusivo da Conta</span>
                                     <div className="flex items-center justify-between gap-4">
-                                        <code className="text-indigo-300 font-mono text-2xl tracking-widest">{appToken || 'Gerando...'}</code>
-                                        <button onClick={copyToken} className="p-3 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-xl text-indigo-400 transition-colors" title="Copiar Token">
+                                        <code className="text-indigo-300 font-mono text-xl tracking-widest break-all">{appToken || 'Gerando...'}</code>
+                                        <button onClick={copyToken} className="p-3 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-xl text-indigo-400 transition-colors shrink-0" title="Copiar Token">
                                             <Copy size={24} />
                                         </button>
                                     </div>
+                                    <p className="text-[11px] text-slate-500 mt-2">
+                                        Este token direciona os trades recebidos exclusivamente para esta conta no TorexJournal.
+                                    </p>
                                 </div>
 
                                 <div className="flex items-center justify-center gap-3 text-sm text-slate-400 bg-slate-900/50 p-4 rounded-xl">

@@ -109,34 +109,39 @@ export const Pricing = () => {
     const getProPlan = () => plans.find(p => p.tier === 'PRO');
 
     if (isLoading) {
-        return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="animate-spin text-emerald-500" /></div>;
+        return (
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+                <Loader2 className="animate-spin text-emerald-500" size={32} />
+            </div>
+        );
     }
 
     const basicPlan = getBasicPlan();
     const proPlan = getProPlan();
+    const exchangeRate = pricingConfig?.exchangeRate ? Number(pricingConfig.exchangeRate) : 65;
 
     return (
-        <div className="min-h-screen py-12 px-4 bg-slate-950">
+        <div className="min-h-screen py-12 px-4 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
             <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Escolha seu Plano</h1>
-                    <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-8">
-                        Desbloqueie todo o potencial do TOREX JOURNAL.
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">Escolha seu Plano</h1>
+                    <p className="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto mb-8">
+                        Desbloqueie todo o potencial do TOREX JOURNAL com análises avançadas e sincronização automática.
                     </p>
 
                     {/* Toggle */}
-                    <div className="inline-flex bg-slate-900 rounded-full p-1 border border-slate-800 relative">
+                    <div className="inline-flex bg-slate-200 dark:bg-slate-900 rounded-full p-1 border border-slate-300 dark:border-slate-800 relative shadow-inner">
                         <button
                             onClick={() => setBillingCycle('MONTHLY')}
-                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${billingCycle === 'MONTHLY' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${billingCycle === 'MONTHLY' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                         >
                             Mensal
                         </button>
                         <button
                             onClick={() => setBillingCycle('YEARLY')}
-                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${billingCycle === 'YEARLY' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${billingCycle === 'YEARLY' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                         >
-                            Anual <span className="text-xs text-emerald-300 ml-1">-20%</span>
+                            Anual <span className="text-xs text-emerald-500 dark:text-emerald-300 ml-1 font-extrabold">-20%</span>
                         </button>
                     </div>
                 </div>
@@ -144,37 +149,37 @@ export const Pricing = () => {
                 <div className="grid md:grid-cols-2 gap-8 mb-12">
                     {/* Basic Plan */}
                     {basicPlan && (
-                        <Card className="p-8 border-slate-700/50 bg-slate-900/40">
+                        <Card className="p-8 border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900/40 shadow-xl rounded-3xl transition-all hover:shadow-2xl">
                             <div className="text-center mb-6">
-                                <h2 className="text-2xl font-bold text-emerald-400 mb-2">Básico</h2>
-                                <div className="flex items-baseline justify-center gap-1">
-                                    <span className="text-sm text-slate-400 align-top mt-2">MT</span>
-                                    <span className="text-5xl font-bold text-white">{getPrice(basicPlan).toFixed(2)}</span>
-                                    <span className="text-sm text-slate-500 self-end mb-2">/mês</span>
+                                <h2 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mb-2">Básico</h2>
+                                <div className="flex items-baseline justify-center gap-1.5">
+                                    <span className="text-2xl font-bold text-slate-500 dark:text-slate-400 align-top mt-1">$</span>
+                                    <span className="text-5xl font-extrabold text-slate-900 dark:text-white font-mono">{getPrice(basicPlan).toFixed(2)}</span>
+                                    <span className="text-sm font-bold text-slate-500 dark:text-slate-400 self-end mb-2">USD /mês</span>
                                 </div>
-                                {pricingConfig && (
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        ~ ${(getPrice(basicPlan) / pricingConfig.exchangeRate).toFixed(2)} USD
-                                    </p>
-                                )}
-                                <p className="text-sm text-slate-500 mt-2">Para quem está começando</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
+                                    ~ MT {(getPrice(basicPlan) * exchangeRate).toFixed(0)} MZN (M-Pesa / e-Mola)
+                                </p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Para quem está começando no trading</p>
                             </div>
-                            <p className="text-sm text-slate-500 mt-2">{basicPlan.description}</p>
+                            {basicPlan.description && (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 text-center">{basicPlan.description}</p>
+                            )}
 
                             <ul className="space-y-4 mb-8">
                                 {basicPlan.features?.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-slate-300">
-                                        <Check className="w-5 h-5 text-emerald-500" />
-                                        <span>{item}</span>
+                                    <li key={i} className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                                        <Check className="w-5 h-5 text-emerald-500 shrink-0" />
+                                        <span className="text-sm font-medium">{item}</span>
                                     </li>
                                 ))}
                                 {(!basicPlan.features || basicPlan.features.length === 0) && (
-                                    <li className="text-slate-500 italic">Sem funcionalidades listadas</li>
+                                    <li className="text-slate-400 italic">Sem funcionalidades listadas</li>
                                 )}
                             </ul>
                             <Button
                                 variant="primary"
-                                className="w-full py-4 rounded-xl"
+                                className="w-full py-4 rounded-xl font-bold"
                                 onClick={() => handleSubscribe(basicPlan)}
                             >
                                 Começar Agora
@@ -184,40 +189,38 @@ export const Pricing = () => {
 
                     {/* Pro Plan */}
                     {proPlan && (
-                        <Card className="p-8 border-indigo-500/50 bg-slate-900/60 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold px-4 py-1 rounded-bl-xl">
+                        <Card className="p-8 border-2 border-indigo-500/50 bg-white dark:bg-slate-900/60 shadow-xl rounded-3xl relative overflow-hidden transition-all hover:shadow-2xl">
+                            <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-black px-4 py-1.5 rounded-bl-xl tracking-wider">
                                 RECOMENDADO
                             </div>
                             <div className="text-center mb-6">
-                                <h2 className="text-2xl font-bold text-indigo-400 mb-2">Premium</h2>
-                                <div className="flex items-baseline justify-center gap-1">
-                                    <span className="text-sm text-slate-400 align-top mt-2">MT</span>
-                                    <span className="text-5xl font-bold text-white">{getPrice(proPlan).toFixed(2)}</span>
-                                    <span className="text-sm text-slate-500 self-end mb-2">/mês</span>
+                                <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">Premium</h2>
+                                <div className="flex items-baseline justify-center gap-1.5">
+                                    <span className="text-2xl font-bold text-slate-500 dark:text-slate-400 align-top mt-1">$</span>
+                                    <span className="text-5xl font-extrabold text-slate-900 dark:text-white font-mono">{getPrice(proPlan).toFixed(2)}</span>
+                                    <span className="text-sm font-bold text-slate-500 dark:text-slate-400 self-end mb-2">USD /mês</span>
                                 </div>
-                                {pricingConfig && (
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        ~ ${(getPrice(proPlan) / pricingConfig.exchangeRate).toFixed(2)} USD
-                                    </p>
-                                )}
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
+                                    ~ MT {(getPrice(proPlan) * exchangeRate).toFixed(0)} MZN (M-Pesa / e-Mola)
+                                </p>
                                 {billingCycle === 'YEARLY' && (
-                                    <p className="text-xs text-emerald-400 mt-2 font-bold">Economize 20% no plano anual</p>
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-bold">Economize 20% no plano anual</p>
                                 )}
                             </div>
                             <ul className="space-y-4 mb-8">
                                 {proPlan.features?.map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-slate-300">
-                                        <CheckCircle className="w-5 h-5 text-indigo-500" />
-                                        <span>{item}</span>
+                                    <li key={i} className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                                        <CheckCircle className="w-5 h-5 text-indigo-500 shrink-0" />
+                                        <span className="text-sm font-medium">{item}</span>
                                     </li>
                                 ))}
                                 {(!proPlan.features || proPlan.features.length === 0) && (
-                                    <li className="text-slate-500 italic">Sem funcionalidades listadas</li>
+                                    <li className="text-slate-400 italic">Sem funcionalidades listadas</li>
                                 )}
                             </ul>
                             <Button
                                 variant="gradient"
-                                className="w-full py-4 rounded-xl"
+                                className="w-full py-4 rounded-xl font-bold"
                                 onClick={() => handleSubscribe(proPlan)}
                             >
                                 Assinar Premium
@@ -226,6 +229,6 @@ export const Pricing = () => {
                     )}
                 </div>
             </div>
-        </div >
+        </div>
     );
 };

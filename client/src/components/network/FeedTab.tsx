@@ -108,9 +108,9 @@ export const FeedTab = ({
 
             {/* Create Post Card */}
             {!isRestricted && (
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-lg">
+                <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm dark:shadow-lg">
                     <div className="flex gap-4">
-                        <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-indigo-500/15 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
                             {user?.username?.[0]?.toUpperCase() || <User size={20} />}
                         </div>
                         <div className="flex-1">
@@ -118,14 +118,14 @@ export const FeedTab = ({
                                 value={newPostContent}
                                 onChange={e => setNewPostContent(e.target.value)}
                                 placeholder="Compartilhe um trade, uma ideia ou uma dúvida..."
-                                className="w-full bg-slate-950/30 border border-slate-800 rounded-xl p-3 text-slate-300 focus:outline-none focus:border-indigo-500/50 min-h-[80px] resize-none transition-colors"
+                                className="w-full bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-slate-800 dark:text-slate-300 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:bg-white dark:focus:bg-slate-950/30 focus:outline-none focus:border-indigo-500 transition-colors"
                             />
                             {mediaPreview && (
                                 <div className="relative mt-3 inline-block">
                                     {mediaType === 'video' ? (
-                                        <video src={mediaPreview} className="max-h-48 rounded-lg border border-slate-700" controls />
+                                        <video src={mediaPreview} className="max-h-48 rounded-lg border border-slate-200 dark:border-slate-700" controls />
                                     ) : (
-                                        <img src={mediaPreview} alt="Preview" className="max-h-48 rounded-lg border border-slate-700 object-contain" />
+                                        <img src={mediaPreview} alt="Preview" className="max-h-48 rounded-lg border border-slate-200 dark:border-slate-700 object-contain" />
                                     )}
                                     <button onClick={removeMedia} className="absolute -top-2 -right-2 bg-slate-800 hover:bg-rose-500 text-white p-1 rounded-full transition-colors shadow-lg">
                                         <X size={14} />
@@ -134,10 +134,10 @@ export const FeedTab = ({
                             )}
                             <div className="flex justify-between items-center mt-3">
                                 <div className="flex gap-2 text-slate-500 relative">
-                                    <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-800 hover:text-indigo-400 rounded-lg transition-colors flex items-center gap-2 text-sm" title="Adicionar Foto/Vídeo">
+                                    <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors flex items-center gap-2 text-sm" title="Adicionar Foto/Vídeo">
                                         <ImageIcon size={18} /> <Video size={18} />
                                     </button>
-                                    <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-slate-800 hover:text-yellow-500 rounded-lg transition-colors flex items-center gap-2 text-sm" title="Adicionar Emoji">
+                                    <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-yellow-600 dark:hover:text-yellow-500 rounded-lg transition-colors flex items-center gap-2 text-sm" title="Adicionar Emoji">
                                         <Smile size={18} />
                                     </button>
 

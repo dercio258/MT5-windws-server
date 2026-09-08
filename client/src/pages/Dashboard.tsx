@@ -1,13 +1,18 @@
 import { useState, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Activity,
     DollarSign,
     Calendar,
     BarChart3,
+    BarChart2,
+    Clock,
+    Shield,
     ArrowUpRight,
     ArrowDownRight,
     RefreshCw,
-    Globe
+    Plus,
+    TrendingUp
 } from 'lucide-react';
 import {
     Chart as ChartJS,
@@ -17,12 +22,14 @@ import {
 } from 'chart.js';
 import { PerformanceRadar } from '../components/dashboard/charts/PerformanceRadar';
 import { DailyPnLChart } from '../components/dashboard/charts/DailyPnLChart';
-// import { HeatmapChart } from '../components/dashboard/charts/HeatmapChart';
-import { WinrateGauge, InstrumentRow, SessionRow, TraderHealthWidget } from '../components/dashboard/StatsWidgets';
+import { InstrumentRow, SessionRow, TraderHealthWidget, detectPnLStatus, WinrateGauge, WinRateGaugeChart, ProfitFactorDonut } from '../components/dashboard/StatsWidgets';
 import { useDashboardStats, useSubscriptionStatus, useTradesFallback } from '../hooks/useDashboard';
 import { useAuth } from '../context/AuthContext';
+import { useAccount } from '../context/AccountContext';
+import { PropFirmProgressCard } from '../components/dashboard/PropFirmProgressCard';
+import { ConsolidatedDashboardView } from '../components/dashboard/ConsolidatedDashboardView';
 import { PlanModal } from '../components/dashboard/PlanModal';
-import { DateBoundaryBanner } from '../components/dashboard/DateBoundaryBanner';
+import { TrialCelebrationModal } from '../components/subscription/TrialCelebrationModal';
 import api from '../api';
 
 // Register ChartJS
@@ -32,44 +39,76 @@ ChartJS.register(
     Legend
 );
 
-// --- COMPONENTS ---
+// --- INSTITUTIONAL STAT CARD COMPONENT ---
+interface StatCardProps {
+    title: string;
+    value: string;
+    subtext?: string;
+    icon: any;
+    trend?: 'up' | 'down' | 'neutral';
+    trendValue?: string;
+}
 
-const StatCard = ({ title, value, subtext, icon: Icon, trend, trendValue }: any) => (
-    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-slate-700 transition-all shadow-lg">
-        {/* Ambient Glow */}
-        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-8 -mt-8 group-hover:from-emerald-500/20 transition-all" />
+export const StatCard = ({ title, value, subtext, icon: Icon, trend, trendValue }: StatCardProps) => {
+    const isUp = trend === 'up';
 
-        <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className={`p-3 rounded-xl ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
-                <Icon size={24} />
-            </div>
-            {trend && (
-                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                    {trend === 'up' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                    {trendValue}
+    return (
+        <div className="bg-[#111319]/80 backdrop-blur-md border border-white/[0.08] hover:border-white/[0.14] rounded-xl p-3.5 sm:p-4 transition-all duration-200 shadow-sm flex flex-col justify-between group">
+            <div className="flex justify-between items-center mb-2">
+                <span className="text-xs sm:text-[13px] font-bold text-slate-200 uppercase tracking-wide">{title}</span>
+                <div className="flex items-center gap-1.5">
+                    {trend && (
+                        <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            isUp 
+                                ? 'bg-emerald-500/10 text-emerald-400' 
+                                : 'bg-rose-500/10 text-rose-400'
+                        }`}>
+                            {isUp ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                            {trendValue}
+                        </span>
+                    )}
+                    <div className="p-1 rounded-md bg-[#161822] text-slate-400">
+                        <Icon size={14} />
+                    </div>
                 </div>
-            )}
-        </div>
+            </div>
 
-        <div className="relative z-10">
-            <h3 className="text-slate-400 text-sm font-medium mb-1">{title}</h3>
-            <div className="text-2xl font-bold text-white">{value}</div>
-            {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
+            <div>
+                <div className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${
+                    title.includes('Lucro') 
+                        ? (value.includes('-') ? 'text-rose-400' : 'text-emerald-400')
+                        : 'text-slate-100'
+                }`}>
+                    {value}
+                </div>
+                {subtext && (
+                    <p className="text-[11px] text-slate-500 mt-0.5 font-medium truncate">
+                        {subtext}
+                    </p>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export const Dashboard = () => {
-    const [includeToday, setIncludeToday] = useState(() => {
-        return localStorage.getItem('trading_cossa_include_today') === 'true';
-    });
-
-    // Date Filter State - Defaults to 30 days
-    const [dateRange, setDateRange] = useState({ 
-        label: 'Últimos 30 Dias', 
-        value: '30days', 
-        start: '', 
-        end: '' 
+    // Date Filter State - Defaults to all time ('all') so existing trade history is immediately visible
+    const [dateRange, setDateRange] = useState(() => {
+        const saved = localStorage.getItem('torex_dashboard_date_range');
+        if (saved) {
+            try { 
+                const parsed = JSON.parse(saved);
+                if (['all', 'yesterday', '7days', '30days', 'custom'].includes(parsed.value)) {
+                    return parsed;
+                }
+            } catch (e) {}
+        }
+        return { 
+            label: 'Tudo', 
+            value: 'all', 
+            start: '', 
+            end: '' 
+        };
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [customStart, setCustomStart] = useState('');
@@ -77,18 +116,21 @@ export const Dashboard = () => {
     const [showRenewalModal, setShowRenewalModal] = useState(false);
 
     const { user } = useAuth();
+    const { selectedAccountId, selectedAccount, isConsolidated } = useAccount();
     const { data: subStatus } = useSubscriptionStatus();
 
     const [showDailyExpirationModal, setShowDailyExpirationModal] = useState(false);
 
     useEffect(() => {
-        if (subStatus?.showWarning) {
+        const warnedThisSession = sessionStorage.getItem('torex_expiration_warned');
+        if (subStatus?.showWarning && !warnedThisSession) {
             setShowDailyExpirationModal(true);
         }
     }, [subStatus]);
 
     const handleCloseExpirationModal = async () => {
         setShowDailyExpirationModal(false);
+        sessionStorage.setItem('torex_expiration_warned', 'true');
         try {
             await api.post('/subscription/warned');
         } catch (error) {
@@ -96,7 +138,27 @@ export const Dashboard = () => {
         }
     };
 
-    // Memoized query start and end date calculation
+    const [showTrialModal, setShowTrialModal] = useState(false);
+
+    useEffect(() => {
+        const seen = localStorage.getItem('torex_trial_modal_seen');
+        if (user?.trialJustGranted && !seen) {
+            setShowTrialModal(true);
+        } else if (user?.hasUsedTrial && !seen && user?.tier === 'PREMIUM') {
+            setShowTrialModal(true);
+        }
+    }, [user]);
+
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return 'Bom dia';
+        if (hour >= 12 && hour < 18) return 'Boa tarde';
+        return 'Boa noite';
+    }, []);
+
+    const displayName = user?.name ? user.name.split(' ')[0] : (user?.username || 'Trader');
+
+    // Memoized query start and end date calculation (always includes current/today data naturally)
     const queryDates = useMemo(() => {
         const now = new Date();
         let start = new Date();
@@ -105,20 +167,9 @@ export const Dashboard = () => {
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
 
-        if (!includeToday) {
-            end.setDate(now.getDate() - 1);
-            end.setHours(23, 59, 59, 999);
-        }
-
         switch (dateRange.value) {
             case 'today':
-                if (!includeToday) {
-                    // Show yesterday instead
-                    start.setDate(now.getDate() - 1);
-                    start.setHours(0, 0, 0, 0);
-                } else {
-                    start.setHours(0, 0, 0, 0);
-                }
+                start.setHours(0, 0, 0, 0);
                 break;
             case 'yesterday':
                 start.setDate(now.getDate() - 1);
@@ -127,18 +178,11 @@ export const Dashboard = () => {
                 end.setHours(23, 59, 59, 999);
                 break;
             case '7days':
-                if (!includeToday) {
-                    start.setDate(now.getDate() - 7);
-                } else {
-                    start.setDate(now.getDate() - 6);
-                }
+                start.setDate(now.getDate() - 7);
+                start.setHours(0, 0, 0, 0);
                 break;
             case '30days':
-                if (!includeToday) {
-                    start.setDate(now.getDate() - 30);
-                } else {
-                    start.setDate(now.getDate() - 29);
-                }
+                start.setDate(now.getDate() - 30);
                 break;
             case 'all':
                 start = new Date('2020-01-01');
@@ -152,14 +196,6 @@ export const Dashboard = () => {
                     end = new Date(customEnd);
                     end.setHours(23, 59, 59, 999);
                 }
-                if (!includeToday) {
-                    const yesterdayLimit = new Date();
-                    yesterdayLimit.setDate(now.getDate() - 1);
-                    yesterdayLimit.setHours(23, 59, 59, 999);
-                    if (end > yesterdayLimit) {
-                        end = yesterdayLimit;
-                    }
-                }
                 break;
         }
 
@@ -167,42 +203,41 @@ export const Dashboard = () => {
             start: start.toISOString(),
             end: end.toISOString()
         };
-    }, [dateRange.value, includeToday, customStart, customEnd]);
+    }, [dateRange.value, customStart, customEnd]);
 
-    const { data: stats, isLoading: isStatsLoading, refetch: refetchStats } = useDashboardStats(queryDates.start, queryDates.end);
-    const { data: tradesFallback } = useTradesFallback();
+    const { data: stats, isLoading: isStatsLoading, refetch: refetchStats } = useDashboardStats(queryDates.start, queryDates.end, selectedAccountId);
+    const { data: tradesFallback } = useTradesFallback(selectedAccountId);
 
     const handleDateFilter = (range: string) => {
-        let label = 'Hoje';
-        if (range === 'yesterday') label = 'Ontem';
+        let label = 'Tudo';
+        if (range === 'today') label = 'Hoje';
+        else if (range === 'yesterday') label = 'Ontem';
         else if (range === '7days') label = '7D';
         else if (range === '30days') label = '30D';
         else if (range === 'all') label = 'Tudo';
 
-        setDateRange({ 
+        const newRange = { 
             label, 
             value: range, 
             start: '', 
             end: '' 
-        });
+        };
+        setDateRange(newRange);
+        localStorage.setItem('torex_dashboard_date_range', JSON.stringify(newRange));
     };
 
     const handleCustomRangeApply = () => {
         if (!customStart) return;
 
-        setDateRange({
+        const newRange = {
             label: 'Personalizado',
             value: 'custom',
-            start: '',
-            end: ''
-        });
+            start: customStart,
+            end: customEnd
+        };
+        setDateRange(newRange);
+        localStorage.setItem('torex_dashboard_date_range', JSON.stringify(newRange));
         setShowDatePicker(false);
-    };
-
-    const handleToggleIncludeToday = () => {
-        const nextVal = !includeToday;
-        setIncludeToday(nextVal);
-        localStorage.setItem('trading_cossa_include_today', String(nextVal));
     };
 
     // --- Memoized Calculations ---
@@ -272,14 +307,6 @@ export const Dashboard = () => {
         return [];
     }, [stats?.bySymbol, tradesFallback]);
 
-    if (!stats && isStatsLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-slate-950">
-                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-            </div>
-        );
-    }
-
     const currentStats = stats || {
         totalPnL: 0,
         winRate: 0,
@@ -290,265 +317,425 @@ export const Dashboard = () => {
         distribution: { wins: 0, losses: 0, breakeven: 0 }
     };
 
+    if (!stats && isStatsLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] bg-[#08090C] gap-3">
+                <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+                <p className="text-xs text-[#9CA3AF] font-mono">Sincronizando métricas operacionais...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="p-6 space-y-6">
-            {/* Account Activation Block overlay */}
-            {subStatus && !subStatus.hasActive && (
-                <PlanModal type={subStatus.isExpired ? 'PLAN_EXPIRED' : 'NO_ACTIVE_PLAN'} />
-            )}
-
-            {/* Daily Expiration Warning Modal */}
-            {showDailyExpirationModal && (
-                <PlanModal 
-                    type="NEAR_EXPIRATION_WARNING" 
-                    onClose={handleCloseExpirationModal}
-                    daysLeft={subStatus?.daysLeft}
-                />
-            )}
-
-            {/* Renewal Modal */}
-            {showRenewalModal && (
-                <PlanModal 
-                    type="RENEWAL_CONFIRMATION" 
-                    onClose={() => setShowRenewalModal(false)}
-                    savedPaymentMethod={(user as any)?.lastPaymentMethod}
-                    savedPhoneNumber={(user as any)?.lastPaymentMethod === 'mpesa' ? (user as any)?.preferredMpesa : (user as any)?.preferredEmola}
-                    planTier={subStatus?.tier}
-                />
-            )}
-
-            {/* Renewal Alert */}
-            {subStatus?.hasActive && subStatus?.daysLeft <= 5 && (
-                <div className="bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-amber-500/20 rounded-xl text-amber-500">
-                            <RefreshCw className="w-6 h-6" />
+        <div className="space-y-4 pb-6">
+            {/* Subscription Expiration Alert Banner */}
+            {subStatus && subStatus.daysLeft !== undefined && subStatus.daysLeft <= 5 && subStatus.daysLeft > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl flex flex-col md:flex-row items-center justify-between gap-3 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500 dark:text-amber-400">
+                            <RefreshCw className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-white font-bold">Sua assinatura expira em {subStatus.daysLeft} dias!</h3>
-                            <p className="text-slate-400 text-sm">Não perca o acesso às suas métricas. Renove agora com um clique.</p>
+                            <h3 className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm">Sua assinatura expira em {subStatus.daysLeft} dias!</h3>
+                            <p className="text-slate-500 dark:text-slate-400 text-xs">Renove com um clique para manter seu histórico sincronizado.</p>
                         </div>
                     </div>
                     <button
                         onClick={() => setShowRenewalModal(true)}
-                        className="w-full md:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                        className="w-full md:w-auto px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-sm active:scale-95"
                     >
                         Renovar Agora
                     </button>
                 </div>
             )}
-            {/* Header */}
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Visão Geral</h1>
-                    <p className="text-slate-400 flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isStatsLoading ? 'bg-yellow-500' : 'bg-emerald-500'} animate-pulse`}></span>
-                        {isStatsLoading ? 'Sincronizando...' : 'Dados atualizados em tempo real'}
-                    </p>
+
+            {/* COMPACT TOOLBAR BAR: Segmented Pills + Refresh + Add Trade */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-0.5">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-[#9CA3AF]">
+                    <span>{greeting}, <strong className="font-semibold text-slate-900 dark:text-[#F3F4F6]">{displayName}</strong></span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 overflow-x-auto no-scrollbar max-w-full">
+
+                {/* Toolbar: Segmented Filters + Refresh + Add Trade */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Segmented Date Pills */}
+                    <div className="flex bg-white dark:bg-[#111319] p-1 rounded-lg border border-slate-200 dark:border-white/[0.08] shadow-xs dark:shadow-none overflow-x-auto no-scrollbar gap-1">
                         {[
-                            { label: 'Hoje', val: 'today' },
+                            { label: 'Tudo', val: 'all' },
                             { label: 'Ontem', val: 'yesterday' },
                             { label: '7D', val: '7days' },
                             { label: '30D', val: '30days' },
-                            { label: 'Tudo', val: 'all' },
                         ].map(opt => (
                             <button
                                 key={opt.val}
                                 onClick={() => handleDateFilter(opt.val)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${dateRange.value === opt.val ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                                className={`px-3 py-1 text-xs rounded-md transition-all cursor-pointer ${
+                                    dateRange.value === opt.val 
+                                        ? 'bg-emerald-50 dark:bg-[rgba(16,185,129,0.08)] border border-emerald-300 dark:border-[rgba(16,185,129,0.45)] text-emerald-700 dark:text-[#34D399] font-semibold shadow-xs' 
+                                        : 'text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-[#F3F4F6] hover:bg-slate-100 dark:hover:bg-[#161822] border border-transparent'
+                                }`}
                             >
                                 {opt.label}
                             </button>
                         ))}
 
-                        <div className="border-l border-slate-700 mx-1 pl-2 relative">
+                        <div className="border-l border-slate-200 dark:border-white/[0.08] mx-0.5 pl-0.5 flex items-center">
                             <button
                                 onClick={() => setShowDatePicker(true)}
-                                className={`p-1.5 rounded-lg transition-colors ${dateRange.value === 'custom' ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400 hover:text-white'}`}
+                                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                    dateRange.value === 'custom' 
+                                        ? 'text-emerald-700 dark:text-[#34D399] bg-emerald-50 dark:bg-[rgba(16,185,129,0.10)] border border-emerald-300 dark:border-[rgba(16,185,129,0.30)]' 
+                                        : 'text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#161822]'
+                                }`}
                                 title="Selecionar Período Personalizado"
                             >
-                                <Calendar size={16} />
+                                <Calendar size={13} />
                             </button>
                         </div>
                     </div>
 
-                    <button onClick={() => refetchStats()} className="p-2 bg-slate-800 text-slate-300 rounded-xl hover:text-white hover:bg-slate-700 transition-all border border-slate-700">
-                        <RefreshCw size={18} className={isStatsLoading ? 'animate-spin' : ''} />
+                    {/* Refresh Button */}
+                    <button 
+                        onClick={() => refetchStats()} 
+                        className="p-2 bg-white dark:bg-[#111319] hover:bg-slate-100 dark:hover:bg-[#161822] text-slate-600 dark:text-[#9CA3AF] hover:text-slate-900 dark:hover:text-white rounded-lg transition-all border border-slate-200 dark:border-white/[0.08] hover:border-emerald-500/40 active:scale-95 cursor-pointer shadow-xs dark:shadow-none"
+                        title="Atualizar Métricas"
+                    >
+                        <RefreshCw size={14} className={isStatsLoading ? 'animate-spin text-emerald-500 dark:text-emerald-400' : ''} />
                     </button>
-                    <button className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20">
-                        Novo Trade Manual
-                    </button>
-                </div>
-            </header>
 
-            {/* Date Boundary Indicator */}
-            <DateBoundaryBanner 
-                includeToday={includeToday} 
-                onToggle={handleToggleIncludeToday} 
-            />
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="Lucro Líquido"
-                    value={`$${currentStats.totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                    subtext="Total acumulado"
-                    icon={DollarSign}
-                    trend={currentStats.totalPnL >= 0 ? "up" : "down"}
-                    trendValue={currentStats.totalPnL >= 0 ? "+ Profit" : "- Loss"}
-                />
-
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-slate-700 transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-full -mr-8 -mt-8" />
-                    <h3 className="text-slate-400 text-sm font-medium mb-2 z-10 w-full text-left">Distribuição de Trades</h3>
-                    <div className="z-10 scale-90 origin-top">
-                        <WinrateGauge
-                            wins={currentStats.distribution.wins}
-                            losses={currentStats.distribution.losses}
-                            breakeven={currentStats.distribution.breakeven}
-                            trades={currentStats.totalTrades}
-                        />
-                    </div>
-                </div>
-
-                <StatCard
-                    title="Profit Factor"
-                    value={currentStats.profitFactor.toFixed(2)}
-                    subtext="Rel. Risco/Retorno"
-                    icon={Activity}
-                    trend={currentStats.profitFactor > 1.5 ? "up" : "down"}
-                    trendValue={currentStats.profitFactor > 1.5 ? "Bom" : "Check"}
-                />
-                <StatCard
-                    title="Taxa de Acerto"
-                    value={`${currentStats.winRate.toFixed(1)}%`}
-                    subtext="Consistência Geral"
-                    icon={BarChart3}
-                    trend={currentStats.winRate > 50 ? "up" : "down"}
-                    trendValue={currentStats.winRate > 50 ? "Alta" : "Foco"}
-                />
-            </div>
-
-            {/* Main Performance Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 h-[450px]">
-                    <DailyPnLChart data={currentStats.dailyPnL} />
-                </div>
-                <div className="lg:col-span-1 h-[450px]">
-                    <PerformanceRadar data={currentStats.radarMetrics} />
+                    {/* Add Trade Link Button */}
+                    <Link 
+                        to="/add-trades"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#10B981] hover:bg-[#34D399] text-[#04110C] rounded-full text-xs font-semibold transition-all hover:shadow-[0_0_20px_rgba(16,185,129,0.22)] active:scale-95"
+                    >
+                        <Plus size={14} strokeWidth={2.5} />
+                        <span>Novo Trade</span>
+                    </Link>
                 </div>
             </div>
 
-            {/* Heatmap Section - Removida conforme solicitação
-            <div className="h-[400px]">
-                <HeatmapChart endDate={queryDates.end} />
-            </div>
-            */}
+            {isConsolidated ? (
+                <ConsolidatedDashboardView stats={currentStats} />
+            ) : (
+                <>
+                    {/* Prop Firm Rules & Progress (if applicable) */}
+                    <PropFirmProgressCard 
+                        propFirmStatus={currentStats.propFirmStatus} 
+                        currency={selectedAccount?.currency} 
+                    />
 
-            {/* Detailed Stats Section */}
-            <div>
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Activity size={20} className="text-indigo-500" />
-                    Detalhamento Operacional
-                </h2>
+                    {/* 4 HIGH-PRIORITY METRIC CARDS IN A ROW ON DESKTOP */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* 1. Total P&L */}
+                        {(() => {
+                            const pnlInfo = detectPnLStatus(currentStats.totalPnL);
+                            const TrendIcon = pnlInfo.trendIcon;
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-[#0b0e14] border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <BarChart3 size={100} className="text-blue-500" />
+                            return (
+                                <div className="relative bg-white dark:bg-[#111319] border border-slate-200 dark:border-white/[0.08] rounded-xl p-4 sm:p-5 hover:border-emerald-500/40 transition-all card-hover flex flex-col justify-between min-h-[195px] overflow-hidden group shadow-xs dark:shadow-none">
+                                    {/* Discreet top green accent line */}
+                                    <div className="absolute top-0 left-4 right-4 h-[2px] bg-emerald-500/80 rounded-full" />
+
+                                    {/* Header / Label */}
+                                    <div className="flex justify-between items-center w-full">
+                                        <span className="text-[11px] font-semibold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-[0.05em]">
+                                            TOTAL P&L
+                                        </span>
+                                        <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#08090C] border border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-[#6B7280] group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors">
+                                            <DollarSign size={14} />
+                                        </div>
+                                    </div>
+
+                                    {/* Value - Centered */}
+                                    <div className="my-auto py-2 flex flex-col items-center justify-center text-center">
+                                        <span className={`text-2xl sm:text-[30px] font-bold font-mono tracking-tight leading-none ${pnlInfo.textClass}`}>
+                                            {pnlInfo.formattedValue}
+                                        </span>
+                                    </div>
+
+                                    {/* Context / Badge - Centered */}
+                                    <div className="flex items-center justify-center w-full">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full ${pnlInfo.badgeBg}`}>
+                                            {TrendIcon && <TrendIcon size={11} />}
+                                            {pnlInfo.badgeLabel}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* 2. Total Trades with WinrateGauge Chart */}
+                        <div className="relative bg-white dark:bg-[#111319] border border-slate-200 dark:border-white/[0.08] rounded-xl p-4 sm:p-5 hover:border-indigo-500/40 transition-all card-hover flex flex-col justify-between min-h-[195px] overflow-hidden group shadow-xs dark:shadow-none">
+                            {/* Discreet top indigo accent line */}
+                            <div className="absolute top-0 left-4 right-4 h-[2px] bg-indigo-500/80 rounded-full" />
+
+                            {/* Header / Label */}
+                            <div className="flex justify-between items-center w-full">
+                                <span className="text-[11px] font-semibold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-[0.05em]">
+                                    TOTAL TRADES
+                                </span>
+                                <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#08090C] border border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-[#6B7280] group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
+                                    <Activity size={14} />
+                                </div>
+                            </div>
+
+                            {/* Gauge Chart - Centered */}
+                            <div className="my-auto flex flex-col items-center justify-center">
+                                <WinrateGauge 
+                                    wins={currentStats.distribution.wins} 
+                                    losses={currentStats.distribution.losses} 
+                                    breakeven={currentStats.distribution.breakeven} 
+                                    trades={currentStats.totalTrades} 
+                                />
+                            </div>
                         </div>
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 relative z-10">Top Instrumentos</h3>
-                        <div className="flex flex-col gap-2 relative z-10">
-                            {instrumentsData.map((item: any, idx: number) => (
-                                <InstrumentRow key={idx} {...item} />
-                            ))}
-                            {instrumentsData.length === 0 && <span className="text-xs text-slate-600 text-center py-4">Sem dados de instrumentos</span>}
+
+                        {/* 3. Win Rate with WinRateGaugeChart */}
+                        <div className="relative bg-white dark:bg-[#111319] border border-slate-200 dark:border-white/[0.08] rounded-xl p-4 sm:p-5 hover:border-emerald-500/40 transition-all card-hover flex flex-col justify-between min-h-[195px] overflow-hidden group shadow-xs dark:shadow-none">
+                            {/* Discreet top green accent line */}
+                            <div className="absolute top-0 left-4 right-4 h-[2px] bg-emerald-500/80 rounded-full" />
+
+                            {/* Header / Label */}
+                            <div className="flex justify-between items-center w-full">
+                                <span className="text-[11px] font-semibold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-[0.05em]">
+                                    TAXA DE ACERTO
+                                </span>
+                                <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#08090C] border border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-[#6B7280] group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors">
+                                    <TrendingUp size={14} />
+                                </div>
+                            </div>
+
+                            {/* Gauge Chart - Centered */}
+                            <div className="my-auto flex flex-col items-center justify-center py-1">
+                                <WinRateGaugeChart 
+                                    winRate={currentStats.winRate} 
+                                    wins={currentStats.distribution.wins} 
+                                    losses={currentStats.distribution.losses} 
+                                />
+                            </div>
+
+                            {/* Context / Badge - Centered */}
+                            <div className="flex items-center justify-center w-full">
+                                <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
+                                    currentStats.winRate >= 50 
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                }`}>
+                                    {currentStats.winRate >= 50 ? 'Consistente' : 'Ajustar'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* 4. Profit Factor with ProfitFactorDonut */}
+                        <div className="relative bg-white dark:bg-[#111319] border border-slate-200 dark:border-white/[0.08] rounded-xl p-4 sm:p-5 hover:border-amber-500/40 transition-all card-hover flex flex-col justify-between min-h-[195px] overflow-hidden group shadow-xs dark:shadow-none">
+                            {/* Discreet top amber accent line */}
+                            <div className="absolute top-0 left-4 right-4 h-[2px] bg-amber-500/80 rounded-full" />
+
+                            {/* Header / Label */}
+                            <div className="flex justify-between items-center w-full">
+                                <span className="text-[11px] font-semibold text-slate-500 dark:text-[#9CA3AF] uppercase tracking-[0.05em]">
+                                    FATOR DE LUCRO
+                                </span>
+                                <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#08090C] border border-slate-200 dark:border-white/[0.06] text-slate-500 dark:text-[#6B7280] group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors">
+                                    <BarChart3 size={14} />
+                                </div>
+                            </div>
+
+                            {/* Donut Chart - Centered */}
+                            <div className="my-auto flex flex-col items-center justify-center py-1">
+                                <ProfitFactorDonut profitFactor={currentStats.profitFactor} />
+                            </div>
+
+                            {/* Context / Badge - Centered */}
+                            <div className="flex items-center justify-center w-full">
+                                <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
+                                    currentStats.profitFactor >= 1.5
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                        : currentStats.profitFactor >= 1.0
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                }`}>
+                                    {currentStats.profitFactor >= 1.75 ? 'Excelente' : currentStats.profitFactor >= 1.3 ? 'Consistente' : currentStats.profitFactor >= 1.0 ? 'Moderado' : 'Atenção'}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="bg-[#0b0e14] border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <Globe size={100} className="text-purple-500" />
+                    {/* MAIN PERFORMANCE SECTION (CHARTS) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-stretch">
+                        <div className="lg:col-span-2 bg-[#111319] border border-white/[0.08] rounded-xl p-4 sm:p-5 card-hover h-[360px] sm:h-[380px] flex flex-col justify-between">
+                            <DailyPnLChart data={currentStats.dailyPnL} />
                         </div>
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 relative z-10">Sessões Ativas</h3>
-                        <div className="flex flex-col gap-2 relative z-10">
-                            {sessionsData.map((session: any, idx: number) => (
-                                <SessionRow key={idx} {...session} />
-                            ))}
+
+                        <div className="lg:col-span-1 bg-[#111319] border border-white/[0.08] rounded-xl p-4 sm:p-5 card-hover h-[360px] sm:h-[380px] flex flex-col justify-between">
+                            <PerformanceRadar data={currentStats.radarMetrics} />
                         </div>
                     </div>
 
-                    <div className="bg-[#0b0e14] border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-center">
-                        <div className="absolute top-0 right-0 p-3 opacity-10">
-                            <Activity size={80} className="text-blue-500" />
+                    {/* INSTITUTIONAL OPERATIONAL BREAKDOWN (3 COLUMNS) */}
+                    <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xs font-bold uppercase tracking-wider text-[#F3F4F6] flex items-center gap-1.5">
+                                <Activity size={14} className="text-emerald-400" />
+                                Detalhamento Operacional
+                            </h2>
+                            <span className="text-[10px] text-[#6B7280] font-mono">
+                                Ativos, Sessões e Disciplina
+                            </span>
                         </div>
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1 relative z-10 text-center">Saúde & Disciplina</h3>
-                        <TraderHealthWidget
-                            score={currentStats.healthScore?.score}
-                            details={currentStats.healthScore?.details}
-                        />
-                    </div>
-                </div>
-            </div>
 
-            {/* Custom Date Picker Modal */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 items-stretch">
+                            {/* Card 1: Top Instrumentos */}
+                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
+                                            <BarChart2 size={13} className="text-emerald-400" />
+                                            Top Instrumentos
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7280] font-mono">Winrate</span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                        {instrumentsData.map((item: any, idx: number) => (
+                                            <InstrumentRow key={idx} {...item} />
+                                        ))}
+                                        {instrumentsData.length === 0 && (
+                                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                                <Activity size={20} className="text-[#4B5563] mb-1.5" />
+                                                <span className="text-xs text-[#6B7280]">Nenhum trade no período</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {instrumentsData.length > 0 && (
+                                    <div className="pt-2 mt-2 border-t border-white/[0.06] flex justify-between items-center text-[10px] text-[#6B7280] font-mono">
+                                        <span>Total: {instrumentsData.length} pares</span>
+                                        <span>Ranking por volume</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Card 2: Sessões Operacionais */}
+                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
+                                            <Clock size={13} className="text-emerald-400" />
+                                            Sessões Operacionais
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7280] font-mono">PnL / Volume</span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                        {sessionsData.map((session: any, idx: number) => (
+                                            <SessionRow key={idx} {...session} />
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="pt-2 mt-2 border-t border-white/[0.06] flex justify-between items-center text-[10px] text-[#6B7280] font-mono">
+                                    <span>Horário UTC</span>
+                                    <span>Centros globais</span>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Saúde & Disciplina */}
+                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
+                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
+                                            <Shield size={13} className="text-emerald-400" />
+                                            Saúde & Disciplina
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7280] font-mono">Comportamento</span>
+                                    </div>
+                                    <TraderHealthWidget
+                                        score={currentStats.healthScore?.score}
+                                        details={currentStats.healthScore?.details}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* CUSTOM DATE PICKER MODAL */}
             {showDatePicker && (
-                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl max-w-sm w-full space-y-5 relative overflow-hidden animate-in zoom-in-95 duration-200">
-                        {/* Modal Glow */}
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full" />
-                        
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
-                                <Calendar size={20} />
+                <div className="fixed inset-0 bg-[#08090C]/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                    <div className="bg-[#111319] border border-white/[0.08] rounded-2xl p-5 shadow-2xl max-w-sm w-full space-y-4">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                                <Calendar size={18} />
                             </div>
                             <div>
                                 <h3 className="text-white font-bold text-sm">Filtro Personalizado</h3>
-                                <p className="text-xs text-slate-500">Defina o intervalo de datas operacional</p>
+                                <p className="text-[11px] text-slate-400">Defina o intervalo operacional</p>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block mb-1.5">Data de Início</label>
+                                <label className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block mb-1">Data de Início</label>
                                 <input
                                     type="date"
                                     value={customStart}
                                     onChange={e => setCustomStart(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl text-xs p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full bg-[#08090C] border border-white/[0.08] rounded-lg text-xs p-2.5 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-mono"
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block mb-1.5">Data de Fim (Opcional)</label>
+                                <label className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block mb-1">Data de Fim (Opcional)</label>
                                 <input
                                     type="date"
                                     value={customEnd}
                                     onChange={e => setCustomEnd(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl text-xs p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full bg-[#08090C] border border-white/[0.08] rounded-lg text-xs p-2.5 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-mono"
                                 />
                             </div>
                         </div>
 
-                        <div className="flex gap-3 pt-2">
+                        <div className="flex gap-2.5 pt-1">
                             <button
                                 onClick={() => setShowDatePicker(false)}
-                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700/80 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-colors border border-slate-700/50"
+                                className="flex-1 py-2 bg-[#161822] hover:bg-[#1C1F2C] text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors border border-white/[0.08]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleCustomRangeApply}
                                 disabled={!customStart}
-                                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+                                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-95"
                             >
-                                Aplicar Filtro
+                                Aplicar
                             </button>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Celebração de 30 Dias de Plano Premium (Trial) */}
+            <TrialCelebrationModal
+                isOpen={showTrialModal}
+                onClose={() => setShowTrialModal(false)}
+                days={user?.trialDays || 30}
+            />
+
+            {/* Modal de Renovação Manual */}
+            {showRenewalModal && (
+                <PlanModal
+                    type="RENEWAL_CONFIRMATION"
+                    onClose={() => setShowRenewalModal(false)}
+                    planTier={user?.tier === 'PREMIUM' ? 'PRO' : 'BASIC'}
+                    daysLeft={subStatus?.daysLeft}
+                />
+            )}
+
+            {/* Modal de Aviso de Expiração Diária */}
+            {showDailyExpirationModal && (
+                <PlanModal
+                    type="NEAR_EXPIRATION_WARNING"
+                    onClose={handleCloseExpirationModal}
+                    planTier={user?.tier === 'PREMIUM' ? 'PRO' : 'BASIC'}
+                    daysLeft={subStatus?.daysLeft}
+                />
             )}
         </div>
     );

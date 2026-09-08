@@ -18,7 +18,7 @@ export const DateBoundaryBanner = ({ includeToday, onToggle }: DateBoundaryBanne
     };
 
     return (
-        <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-slate-700/60 shadow-lg group">
+        <div className="relative overflow-hidden bg-[#111319]/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-white/[0.15] shadow-lg group">
             {/* Ambient Glow */}
             <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-full -mr-8 -mt-8 transition-opacity duration-500 ${includeToday ? 'opacity-100 from-emerald-500/5' : ''}`} />
 
@@ -27,7 +27,7 @@ export const DateBoundaryBanner = ({ includeToday, onToggle }: DateBoundaryBanne
                     <Calendar size={20} className={includeToday ? '' : 'animate-pulse'} />
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-1.5 leading-none">
+                    <h3 className="text-sm font-bold text-[#F3F4F6] flex items-center gap-1.5 leading-none">
                         {includeToday ? (
                             <>
                                 <span>Dados de hoje incluídos</span>
@@ -37,7 +37,7 @@ export const DateBoundaryBanner = ({ includeToday, onToggle }: DateBoundaryBanne
                             'Exibindo dados consolidados'
                         )}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5 font-mono">
+                    <p className="text-xs text-[#9CA3AF] mt-1 flex items-center gap-1.5 font-mono">
                         {includeToday ? (
                             <>
                                 Até hoje: <span className="text-emerald-400 font-semibold">{formatDate(today)}</span>
@@ -45,8 +45,8 @@ export const DateBoundaryBanner = ({ includeToday, onToggle }: DateBoundaryBanne
                         ) : (
                             <>
                                 Até ontem: <span className="text-indigo-400 font-semibold">{formatDate(yesterday)}</span>
-                                <span className="text-slate-600">|</span>
-                                <span className="text-slate-500 text-[10px] flex items-center gap-1" title="Por padrão, ocultamos dados parciais do dia de hoje para evitar ruído de operações em andamento.">
+                                <span className="text-white/20">|</span>
+                                <span className="text-[#6B7280] text-[10px] flex items-center gap-1" title="Por padrão, ocultamos dados parciais do dia de hoje para evitar ruído de operações em andamento.">
                                     <HelpCircle size={12} className="cursor-help" /> dados até ontem
                                 </span>
                             </>
@@ -59,7 +59,7 @@ export const DateBoundaryBanner = ({ includeToday, onToggle }: DateBoundaryBanne
                 onClick={onToggle}
                 className={`relative z-10 flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-300 ${
                     includeToday
-                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white'
+                        ? 'bg-[#161822] text-[#F3F4F6] border-white/[0.08] hover:bg-[#1C1F2C]'
                         : 'bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500 shadow-md shadow-indigo-600/10 hover:shadow-indigo-500/20 active:scale-95'
                 }`}
             >

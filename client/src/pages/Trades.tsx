@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-    MoreHorizontal, Download, RefreshCw, ChevronLeft, ChevronRight
+    MoreHorizontal, Download, RefreshCw, ChevronLeft, ChevronRight, Plus
 } from 'lucide-react';
 import api from '../api';
+import { useAccount } from '../context/AccountContext';
 
 interface Trade {
     id: number;
@@ -18,19 +20,14 @@ interface Trade {
     swap: number;
     session?: string;
     status?: string;
+    accountName?: string;
 }
-
-import { useNavigate } from 'react-router-dom';
-import { DateBoundaryBanner } from '../components/dashboard/DateBoundaryBanner';
 
 export const Trades = () => {
     const navigate = useNavigate();
+    const { selectedAccountId, isConsolidated } = useAccount();
     const [trades, setTrades] = useState<Trade[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    const [includeToday, setIncludeToday] = useState(() => {
-        return localStorage.getItem('trading_cossa_include_today') === 'true';
-    });
 
     // Filters
     const [ticketFilter, setTicketFilter] = useState('');
@@ -47,13 +44,17 @@ export const Trades = () => {
     const fetchTrades = async () => {
         setIsLoading(true);
         try {
-            const res = await api.get('/dashboard/trades');
+            const params: any = {};
+            if (selectedAccountId) {
+                params.accountId = selectedAccountId;
+            }
+            const res = await api.get('/dashboard/trades', { params });
             if (Array.isArray(res.data)) {
                 const mappedTrades = res.data.map((t: any) => ({
                     id: t.id,
                     ticket: t.ticket,
                     closeTime: t.closeTime,
-                    symbol: t.symbol.replace(/m$/, ''),
+                    symbol: t.symbol ? t.symbol.replace(/m$/, '') : '',
                     type: t.type,
                     volume: Number(t.volume),
                     profit: Number(t.profit) + Number(t.commission) + Number(t.swap),
@@ -62,7 +63,8 @@ export const Trades = () => {
                     commission: Number(t.commission),
                     swap: Number(t.swap),
                     session: t.session || '-',
-                    status: t.status || 'Closed'
+                    status: t.status || 'Closed',
+                    accountName: t.accountName || t.account?.name || null
                 }));
                 setTrades(mappedTrades);
             }
@@ -75,7 +77,7 @@ export const Trades = () => {
 
     useEffect(() => {
         fetchTrades();
-    }, []);
+    }, [selectedAccountId]);
 
     // Extract Unique Symbols for Filter
     const availableSymbols = useMemo(() => {
@@ -86,13 +88,6 @@ export const Trades = () => {
     // Filter & Sort Logic
     const filteredTrades = useMemo(() => {
         let result = trades.filter(trade => {
-            // Exclude today's trades if !includeToday
-            if (!includeToday) {
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-                const tradeDate = new Date(trade.closeTime);
-                if (tradeDate >= todayStart) return false;
-            }
 
             // Ticket Filter
             if (ticketFilter && !trade.ticket?.toString().includes(ticketFilter)) return false;
@@ -135,7 +130,7 @@ export const Trades = () => {
                 default: return 0;
             }
         });
-    }, [trades, ticketFilter, symbolFilter, typeFilter, statusFilter, dateRange, sortOption, includeToday]);
+    }, [trades, ticketFilter, symbolFilter, typeFilter, statusFilter, dateRange, sortOption]);
 
     // Pagination Logic
     const totalPages = Math.ceil(filteredTrades.length / itemsPerPage);
@@ -152,34 +147,29 @@ export const Trades = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Trades</h1>
-                    <p className="text-slate-400">Gerencie e analise seu histórico de operações</p>
-                </div>
-                <div className="flex gap-3">
-                    <button onClick={fetchTrades} className="p-2 bg-slate-800 text-slate-300 rounded-xl hover:text-white hover:bg-slate-700 transition-all border border-slate-700">
-                        <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600/10 text-indigo-400 rounded-xl hover:bg-indigo-600/20 transition-all border border-indigo-600/20 font-bold">
-                        <Download size={18} /> Exportar CSV
-                    </button>
-                </div>
+            {/* Header Actions Toolbar */}
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pb-1">
+                <button
+                    onClick={() => navigate('/add-trades')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-sm font-bold text-xs cursor-pointer active:scale-95"
+                >
+                    <Plus size={15} /> Adicionar Trades
+                </button>
+                <button
+                    onClick={fetchTrades}
+                    className="p-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-800 cursor-pointer shadow-xs active:scale-95"
+                    title="Atualizar lista"
+                >
+                    <RefreshCw size={15} className={isLoading ? 'animate-spin text-indigo-500 dark:text-indigo-400' : ''} />
+                </button>
+                <button className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-600/20 transition-all border border-indigo-200 dark:border-indigo-600/20 font-bold text-xs cursor-pointer">
+                    <Download size={15} /> Exportar CSV
+                </button>
             </div>
 
-            {/* Date Boundary Indicator */}
-            <DateBoundaryBanner 
-                includeToday={includeToday} 
-                onToggle={() => {
-                    const nextVal = !includeToday;
-                    setIncludeToday(nextVal);
-                    localStorage.setItem('trading_cossa_include_today', String(nextVal));
-                }} 
-            />
 
             {/* Filters Bar */}
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 p-4 rounded-2xl flex flex-col gap-4">
+            <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-col gap-4 shadow-sm">
 
                 <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
                     {/* Left: Input Filters */}
@@ -191,7 +181,7 @@ export const Trades = () => {
                                 placeholder="Ticket ID..."
                                 value={ticketFilter}
                                 onChange={(e) => setTicketFilter(e.target.value)}
-                                className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-slate-200 focus:ring-2 focus:ring-emerald-500/50 outline-none w-32 placeholder:text-slate-600"
+                                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/50 outline-none w-32 placeholder:text-slate-400 dark:placeholder:text-slate-600"
                             />
                         </div>
 
@@ -199,7 +189,7 @@ export const Trades = () => {
                         <select
                             value={symbolFilter}
                             onChange={(e) => setSymbolFilter(e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-slate-300 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer"
+                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer"
                         >
                             <option value="ALL">Todos os Símbolos</option>
                             {availableSymbols.map(sym => (
@@ -208,17 +198,17 @@ export const Trades = () => {
                         </select>
 
                         {/* Date Inputs */}
-                        <div className="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl p-1">
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-1">
                             <input
                                 type="date"
-                                className="bg-transparent text-xs text-slate-400 focus:text-slate-200 outline-none p-1.5"
+                                className="bg-transparent text-xs text-slate-700 dark:text-slate-400 focus:text-slate-900 dark:focus:text-slate-200 outline-none p-1.5"
                                 value={dateRange.start}
                                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                             />
-                            <span className="text-slate-600">-</span>
+                            <span className="text-slate-400 dark:text-slate-600">-</span>
                             <input
                                 type="date"
-                                className="bg-transparent text-xs text-slate-400 focus:text-slate-200 outline-none p-1.5"
+                                className="bg-transparent text-xs text-slate-700 dark:text-slate-400 focus:text-slate-900 dark:focus:text-slate-200 outline-none p-1.5"
                                 value={dateRange.end}
                                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                             />
@@ -231,7 +221,7 @@ export const Trades = () => {
                         <select
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-slate-300 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer text-xs"
+                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer text-xs"
                         >
                             <option value="ALL">Todos os Tipos</option>
                             <option value="BUY">Compra (Buy)</option>
@@ -242,7 +232,7 @@ export const Trades = () => {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-slate-300 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer text-xs"
+                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-300 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer text-xs"
                         >
                             <option value="ALL">Todos os Status</option>
                             <option value="Open">Open</option>
@@ -250,11 +240,11 @@ export const Trades = () => {
                         </select>
 
                         {/* Sort Selector */}
-                        <div className="border-l border-slate-700 pl-3 ml-1">
+                        <div className="border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">
                             <select
                                 value={sortOption}
                                 onChange={(e) => setSortOption(e.target.value)}
-                                className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-indigo-400 font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none cursor-pointer text-xs"
+                                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-indigo-600 dark:text-indigo-400 font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none cursor-pointer text-xs"
                             >
                                 <option value="date-desc">📅 Data (Mais recente)</option>
                                 <option value="date-asc">📅 Data (Mais antiga)</option>
@@ -269,11 +259,12 @@ export const Trades = () => {
             </div>
 
             {/* Trades Table */}
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-xl">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-950/50 text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="bg-slate-100/90 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider font-bold">
                             <tr>
+                                {isConsolidated && <th className="p-4 whitespace-nowrap">Conta</th>}
                                 <th className="p-4 whitespace-nowrap">Ticket</th>
                                 <th className="p-4 whitespace-nowrap">Data</th>
                                 <th className="p-4 whitespace-nowrap">Símbolo</th>
@@ -287,17 +278,25 @@ export const Trades = () => {
                                 <th className="p-4 whitespace-nowrap text-center">Ações</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/50 text-sm">
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50 text-sm">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-slate-500">
+                                    <td colSpan={isConsolidated ? 12 : 11} className="p-8 text-center text-slate-500">
                                         Carregando trades...
                                     </td>
                                 </tr>
                             ) : paginatedTrades.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-slate-500">
-                                        Nenhum trade encontrado com os filtros selecionados.
+                                    <td colSpan={isConsolidated ? 12 : 11} className="p-12 text-center">
+                                        <div className="flex flex-col items-center justify-center gap-3">
+                                            <p className="text-slate-600 dark:text-slate-400 font-medium">Nenhum trade encontrado com os filtros selecionados.</p>
+                                            <button
+                                                onClick={() => navigate('/add-trades')}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-xl transition-all text-xs font-bold cursor-pointer"
+                                            >
+                                                <Plus size={14} /> Importar / Adicionar Trades
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
@@ -305,71 +304,78 @@ export const Trades = () => {
                                     <tr
                                         key={trade.id}
                                         onClick={() => navigate(`/trades/${trade.id}`)}
-                                        className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer"
                                     >
-                                        <td className="p-4 text-slate-500 font-mono text-xs">#{trade.ticket}</td>
-                                        <td className="p-4 text-slate-400 whitespace-nowrap text-xs">
-                                            {new Date(trade.closeTime).toLocaleString('pt-BR')}
-                                        </td>
-                                        <td className="p-4 font-bold text-slate-200">{trade.symbol}</td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-[10px] font-bold border ${trade.type === 'BUY' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                                                {trade.type}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-slate-400 font-mono">{trade.volume.toFixed(2)}</td>
-                                        <td className="p-4 text-right font-mono text-slate-400">{trade.openPrice}</td>
-                                        <td className="p-4 text-right font-mono text-slate-400">{trade.closePrice || '-'}</td>
-                                        <td className="p-4 text-right font-mono text-slate-500 text-xs">
-                                            {(trade.commission + trade.swap).toFixed(2)}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            {trade.profit > 0 ? (
-                                                <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400">WIN</span>
-                                            ) : trade.profit < 0 ? (
-                                                <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400">LOSS</span>
-                                            ) : (
-                                                <span className="text-slate-500">-</span>
-                                            )}
-                                        </td>
-                                        <td className={`p-4 text-right font-bold font-mono ${trade.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {trade.profit >= 0 ? '+' : ''}{trade.profit.toFixed(2)}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <button className="p-1.5 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors">
-                                                <MoreHorizontal size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                        {isConsolidated && (
+                                             <td className="p-4 whitespace-nowrap">
+                                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                                                     {trade.accountName || 'Principal'}
+                                                 </span>
+                                             </td>
+                                         )}
+                                         <td className="p-4 text-slate-500 dark:text-slate-400 font-mono text-xs">#{trade.ticket}</td>
+                                         <td className="p-4 text-slate-600 dark:text-slate-400 whitespace-nowrap text-xs">
+                                             {new Date(trade.closeTime).toLocaleString('pt-BR')}
+                                         </td>
+                                         <td className="p-4 font-bold text-slate-900 dark:text-slate-200">{trade.symbol}</td>
+                                         <td className="p-4">
+                                             <span className={`px-2 py-1 rounded text-[10px] font-bold border ${trade.type === 'BUY' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
+                                                 {trade.type}
+                                             </span>
+                                         </td>
+                                         <td className="p-4 text-slate-700 dark:text-slate-400 font-mono">{trade.volume.toFixed(2)}</td>
+                                         <td className="p-4 text-right font-mono text-slate-700 dark:text-slate-400">{trade.openPrice}</td>
+                                         <td className="p-4 text-right font-mono text-slate-700 dark:text-slate-400">{trade.closePrice || '-'}</td>
+                                         <td className="p-4 text-right font-mono text-slate-500 text-xs">
+                                             {(trade.commission + trade.swap).toFixed(2)}
+                                         </td>
+                                         <td className="p-4 text-center">
+                                             {trade.profit > 0 ? (
+                                                 <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">WIN</span>
+                                             ) : trade.profit < 0 ? (
+                                                 <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">LOSS</span>
+                                             ) : (
+                                                 <span className="text-slate-400">-</span>
+                                             )}
+                                         </td>
+                                         <td className={`p-4 text-right font-bold font-mono ${trade.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                             {trade.profit >= 0 ? '+' : ''}{trade.profit.toFixed(2)}
+                                         </td>
+                                         <td className="p-4 text-center">
+                                             <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
+                                                 <MoreHorizontal size={16} />
+                                             </button>
+                                         </td>
+                                     </tr>
+                                 ))
+                             )}
+                         </tbody>
+                     </table>
+                 </div>
 
-                {/* Pagination */}
-                <div className="p-4 border-t border-slate-800 flex justify-between items-center">
-                    <span className="text-xs text-slate-500">
-                        Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredTrades.length)} - {Math.min(currentPage * itemsPerPage, filteredTrades.length)} de {filteredTrades.length} trades
-                    </span>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                        <button
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div >
-    );
-};
+                 {/* Pagination */}
+                 <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                     <span className="text-xs text-slate-600 dark:text-slate-400">
+                         Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredTrades.length)} - {Math.min(currentPage * itemsPerPage, filteredTrades.length)} de {filteredTrades.length} trades
+                     </span>
+                     <div className="flex gap-2">
+                         <button
+                             onClick={() => handlePageChange(currentPage - 1)}
+                             disabled={currentPage === 1}
+                             className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                         >
+                             <ChevronLeft size={16} />
+                         </button>
+                         <button
+                             onClick={() => handlePageChange(currentPage + 1)}
+                             disabled={currentPage === totalPages}
+                             className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                         >
+                             <ChevronRight size={16} />
+                         </button>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     );
+ };

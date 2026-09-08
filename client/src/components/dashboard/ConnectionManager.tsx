@@ -4,9 +4,11 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Cloud, Monitor, CheckCircle, Download, Power, AlertTriangle, FileText, Upload, Copy, Wifi } from 'lucide-react';
 import api from '../../api';
+import { useAccount } from '../../context/AccountContext';
 
 export const ConnectionManager = () => {
     const [method, setMethod] = useState<'LOCAL' | 'CLOUD' | 'FILE'>('LOCAL');
+    const { selectedAccountId, refreshAccounts } = useAccount();
 
     // Cloud State
     const [cloudLogin, setCloudLogin] = useState('');
@@ -92,13 +94,25 @@ export const ConnectionManager = () => {
 
         const formData = new FormData();
         formData.append('file', selectedFile);
+        if (selectedAccountId && selectedAccountId !== 'all') {
+            formData.append('accountId', selectedAccountId);
+        }
 
         try {
-            await api.post('/import/report', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+            const url = selectedAccountId && selectedAccountId !== 'all'
+                ? `/import/report?accountId=${selectedAccountId}`
+                : '/import/report';
+
+            await api.post(url, formData, {
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    ...(selectedAccountId && selectedAccountId !== 'all' ? { 'x-account-id': selectedAccountId } : {})
+                }
             });
-            setStatusData({ message: 'Report imported successfully! History updated.' });
+            setStatusData({ message: 'Relatório importado com sucesso! Histórico atualizado.' });
             setSelectedFile(null);
+            await refreshAccounts();
+            window.dispatchEvent(new Event('trade-imported'));
         } catch (e: any) {
             setStatusData({ error: e.response?.data?.message || e.message });
         } finally {
@@ -107,23 +121,23 @@ export const ConnectionManager = () => {
     };
 
     return (
-        <Card className="p-6 space-y-6 bg-slate-900 border-slate-800">
+        <Card className="p-6 space-y-6 bg-[#111319] border-white/[0.08] shadow-2xl">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-[#F3F4F6] flex items-center gap-2">
                         <Monitor className="text-emerald-500" />
                         Trading Connection
                     </h2>
-                    <p className="text-slate-400 text-sm">Choose how you want to connect your MT5 account.</p>
+                    <p className="text-[#9CA3AF] text-sm">Choose how you want to connect your MT5 account.</p>
                 </div>
 
-                <div className={`px-3 py-1 rounded-full border flex items-center gap-2 text-xs font-bold ${connectionStatus ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+                <div className={`px-3 py-1 rounded-full border flex items-center gap-2 text-xs font-bold ${connectionStatus ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#161822] border-white/[0.08] text-[#6B7280]'}`}>
                     <Wifi size={14} className={connectionStatus ? 'animate-pulse' : ''} />
                     {connectionStatus ? 'ONLINE' : 'OFFLINE'}
                 </div>
             </div>
 
-            <div className="flex gap-2 p-1 bg-slate-950/50 rounded-xl overflow-x-auto">
+            <div className="flex gap-2 p-1 bg-[#0C0D12] rounded-xl overflow-x-auto border border-white/[0.06]">
                 <Button
                     variant={method === 'LOCAL' ? 'primary' : 'secondary'}
                     onClick={() => setMethod('LOCAL')}
@@ -151,29 +165,29 @@ export const ConnectionManager = () => {
             </div>
 
             {method === 'LOCAL' && (
-                <div className="space-y-4 bg-slate-950/30 p-6 rounded-xl border border-slate-800/50 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-4 bg-[#0C0D12]/50 p-6 rounded-xl border border-white/[0.06] animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-start gap-4">
                         <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-400">
                             <CheckCircle size={24} />
                         </div>
                         <div className="space-y-1">
-                            <h3 className="font-semibold text-white">Instructions</h3>
-                            <p className="text-sm text-slate-400">Run the Expert Advisor on your own PC. Best for privacy and zero cost.</p>
+                            <h3 className="font-semibold text-[#F3F4F6]">Instructions</h3>
+                            <p className="text-sm text-[#9CA3AF]">Run the Expert Advisor on your own PC. Best for privacy and zero cost.</p>
                         </div>
                     </div>
 
-                    <ol className="list-decimal list-inside text-sm text-slate-400 space-y-3 ml-2 border-l-2 border-slate-800 pl-4 py-2">
-                        <li>Download <span className="text-white font-mono bg-slate-800 px-1 rounded">CossaConnector.ex5</span></li>
+                    <ol className="list-decimal list-inside text-sm text-[#9CA3AF] space-y-3 ml-2 border-l-2 border-white/[0.08] pl-4 py-2">
+                        <li>Download <span className="text-[#F3F4F6] font-mono bg-[#161822] border border-white/[0.06] px-1.5 py-0.5 rounded">CossaConnector.ex5</span></li>
                         <li>Open MT5 &gt; File &gt; Open Data Folder &gt; MQL5 &gt; Experts</li>
                         <li>Copy the file and restart MT5</li>
                         <li>Drag to any chart and allow "DLL Imports"</li>
                         <li>
-                            Enter your <span className="text-white font-bold">App Token</span>:
+                            Enter your <span className="text-[#F3F4F6] font-bold">App Token</span>:
                             <div className="mt-2 flex items-center gap-2">
-                                <code className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-400 font-mono text-xs select-all">
+                                <code className="bg-[#08090C] border border-white/[0.08] rounded px-2 py-1 text-indigo-400 font-mono text-xs select-all">
                                     {apiToken}
                                 </code>
-                                <button onClick={copyToken} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Copy Token">
+                                <button onClick={copyToken} className="p-1 hover:bg-[#161822] rounded text-[#9CA3AF] hover:text-[#F3F4F6] transition-colors" title="Copy Token">
                                     <Copy size={14} />
                                 </button>
                             </div>
@@ -194,14 +208,14 @@ export const ConnectionManager = () => {
             )}
 
             {method === 'CLOUD' && (
-                <div className="space-y-4 bg-slate-950/30 p-6 rounded-xl border border-emerald-500/10 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-4 bg-[#0C0D12]/50 p-6 rounded-xl border border-emerald-500/20 animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-start gap-4 mb-4">
                         <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400">
                             <Cloud size={24} />
                         </div>
                         <div className="space-y-1">
-                            <h3 className="font-semibold text-white">Cloud Hosting</h3>
-                            <p className="text-sm text-slate-400">We run MT5 for you. Requires your trading password to auto-login.</p>
+                            <h3 className="font-semibold text-[#F3F4F6]">Cloud Hosting</h3>
+                            <p className="text-sm text-[#9CA3AF]">We run MT5 for you. Requires your trading password to auto-login.</p>
                         </div>
                     </div>
 
@@ -211,7 +225,7 @@ export const ConnectionManager = () => {
                             placeholder="Ex: MetaQuotes-Demo"
                             value={cloudServer}
                             onChange={(e) => setCloudServer(e.target.value)}
-                            className="bg-slate-900 border-slate-700"
+                            className="bg-[#08090C] border-white/[0.08]"
                         />
 
                         <div className="grid grid-cols-2 gap-4">
@@ -221,7 +235,7 @@ export const ConnectionManager = () => {
                                 type="text"
                                 value={cloudLogin}
                                 onChange={(e) => setCloudLogin(e.target.value)}
-                                className="bg-slate-900 border-slate-700"
+                                className="bg-[#08090C] border-white/[0.08]"
                             />
                             <Input
                                 label="Trading Password"
@@ -229,7 +243,7 @@ export const ConnectionManager = () => {
                                 type="password"
                                 value={cloudPass}
                                 onChange={(e) => setCloudPass(e.target.value)}
-                                className="bg-slate-900 border-slate-700"
+                                className="bg-[#08090C] border-white/[0.08]"
                             />
                         </div>
 
@@ -273,33 +287,33 @@ export const ConnectionManager = () => {
             )}
 
             {method === 'FILE' && (
-                <div className="space-y-6 bg-slate-950/30 p-6 rounded-xl border border-indigo-500/10 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-6 bg-[#0C0D12]/50 p-6 rounded-xl border border-white/[0.06] animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-start gap-4">
                         <div className="p-3 bg-indigo-500/10 rounded-lg text-indigo-400">
                             <FileText size={24} />
                         </div>
                         <div className="space-y-1">
-                            <h3 className="font-semibold text-white">Import History</h3>
-                            <p className="text-sm text-slate-400">Choose a file format to sync your trading history.</p>
+                            <h3 className="font-semibold text-[#F3F4F6]">Import History</h3>
+                            <p className="text-sm text-[#9CA3AF]">Choose a file format to sync your trading history.</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-lg hover:border-indigo-500/30 transition-all group cursor-pointer relative overflow-hidden" onClick={() => document.getElementById('report-upload')?.click()}>
+                        <div className="p-4 bg-[#111319] border border-white/[0.08] rounded-xl hover:border-indigo-500/40 hover:bg-[#161822] transition-all group cursor-pointer relative overflow-hidden" onClick={() => document.getElementById('report-upload')?.click()}>
                             <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <FileText size={64} />
                             </div>
-                            <h4 className="font-bold text-slate-200 mb-1">MetaTrader 4/5 Report</h4>
-                            <p className="text-xs text-slate-500 mb-3">Export your history as HTML from MT4 or MT5 terminal.</p>
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded">Recommended</span>
+                            <h4 className="font-bold text-[#F3F4F6] mb-1">MetaTrader 4/5 Report</h4>
+                            <p className="text-xs text-[#9CA3AF] mb-3">Export your history as HTML from MT4 or MT5 terminal.</p>
+                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded border border-indigo-500/30">Recommended</span>
                         </div>
 
-                        <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-lg hover:border-emerald-500/30 transition-all group cursor-pointer relative overflow-hidden">
+                        <div className="p-4 bg-[#111319] border border-white/[0.08] rounded-xl hover:border-emerald-500/40 hover:bg-[#161822] transition-all group cursor-pointer relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <FileText size={64} />
                             </div>
-                            <h4 className="font-bold text-slate-200 mb-1">CSV / Excel Template</h4>
-                            <p className="text-xs text-slate-500 mb-3">Upload your trades using our standardized CSV format.</p>
+                            <h4 className="font-bold text-[#F3F4F6] mb-1">CSV / Excel Template</h4>
+                            <p className="text-xs text-[#9CA3AF] mb-3">Upload your trades using our standardized CSV format.</p>
                             <button
                                 onClick={(e) => { e.stopPropagation(); window.open('/template.csv'); }}
                                 className="text-[10px] flex items-center gap-1 text-emerald-400 hover:text-emerald-300 hover:underline"
@@ -309,7 +323,7 @@ export const ConnectionManager = () => {
                         </div>
                     </div>
 
-                    <div className="border-2 border-dashed border-slate-700/50 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-indigo-500/50 hover:bg-slate-800/30 transition-all bg-slate-900/20">
+                    <div className="border-2 border-dashed border-white/[0.12] rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-indigo-500/50 hover:bg-[#161822]/30 transition-all bg-[#08090C]/40">
                         <input
                             type="file"
                             id="report-upload"
@@ -318,12 +332,12 @@ export const ConnectionManager = () => {
                             onChange={handleFileSelect}
                         />
                         <label htmlFor="report-upload" className="cursor-pointer flex flex-col items-center gap-4 w-full h-full">
-                            <div className="p-4 bg-slate-800 rounded-full text-indigo-400 shadow-lg shadow-indigo-500/10 ring-1 ring-white/5">
+                            <div className="p-4 bg-[#161822] rounded-full text-indigo-400 shadow-lg shadow-indigo-500/10 border border-white/[0.08]">
                                 <Upload size={24} />
                             </div>
                             <div>
-                                <p className="text-slate-200 font-medium">Click to upload report</p>
-                                <p className="text-xs text-slate-500 mt-1">Supports: .html (MT4/5), .csv, .xlsx</p>
+                                <p className="text-[#F3F4F6] font-medium">Click to upload report</p>
+                                <p className="text-xs text-[#9CA3AF] mt-1">Supports: .html (MT4/5), .csv, .xlsx</p>
                             </div>
                         </label>
                     </div>
@@ -332,9 +346,9 @@ export const ConnectionManager = () => {
                         <div className="flex items-center justify-between p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
                             <div className="flex items-center gap-3">
                                 <FileText className="text-indigo-400" size={16} />
-                                <span className="text-sm font-medium text-slate-200">{selectedFile.name}</span>
+                                <span className="text-sm font-medium text-[#F3F4F6]">{selectedFile.name}</span>
                             </div>
-                            <span className="text-xs text-slate-500 font-mono">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                            <span className="text-xs text-[#9CA3AF] font-mono">{(selectedFile.size / 1024).toFixed(1)} KB</span>
                         </div>
                     )}
 

@@ -15,6 +15,10 @@ api.interceptors.request.use((config) => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+    const accountId = localStorage.getItem('torex_selected_account_id');
+    if (accountId) {
+        config.headers['x-account-id'] = accountId;
+    }
     return config;
 });
 

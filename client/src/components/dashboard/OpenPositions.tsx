@@ -74,7 +74,7 @@ export const OpenPositions = () => {
                 <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
                     <Activity className="w-4 h-4 text-blue-400" /> Posições Abertas
                 </h2>
-                <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded">
+                <span className="text-xs font-mono text-slate-300 bg-[#161822] border border-white/[0.08] px-2 py-0.5 rounded-lg">
                     {positions.length} Ativa{positions.length !== 1 ? 's' : ''}
                 </span>
             </div>
@@ -82,7 +82,7 @@ export const OpenPositions = () => {
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead>
-                        <tr className="border-b border-slate-700/50">
+                        <tr className="border-b border-white/[0.08]">
                             <th className="py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Símbolo</th>
                             <th className="py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Tipo</th>
                             <th className="text-right py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Volume</th>
@@ -91,11 +91,11 @@ export const OpenPositions = () => {
                             <th className="text-right py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Lucro</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/30">
+                    <tbody className="divide-y divide-white/[0.06]">
                         {positions.map((pos) => {
                             const isWin = pos.profit >= 0;
                             return (
-                                <tr key={pos.ticket} className="hover:bg-slate-800/30 transition-colors">
+                                <tr key={pos.ticket} className="hover:bg-[#161822]/50 transition-colors">
                                     <td className="py-3 px-4 font-medium text-slate-200">{pos.symbol}</td>
                                     <td className="py-3 px-4">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${pos.type === 'BUY' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>

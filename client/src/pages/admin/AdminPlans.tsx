@@ -2,12 +2,22 @@ import { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { Edit, Check } from 'lucide-react';
+import { Edit, Check, Gift, Sparkles, Power, Users, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import api from '../../api';
 
 export const AdminPlans = () => {
     const [plans, setPlans] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Trial Campaign Global State
+    const [trialCampaign, setTrialCampaign] = useState<{
+        active: boolean;
+        trialDays: number;
+        tier: string;
+        totalTrialsGranted: number;
+    } | null>(null);
+    const [isTogglingTrial, setIsTogglingTrial] = useState(false);
+    const [trialMessage, setTrialMessage] = useState<string | null>(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,6 +34,7 @@ export const AdminPlans = () => {
 
     useEffect(() => {
         fetchPlans();
+        fetchTrialCampaign();
     }, []);
 
     const fetchPlans = async () => {
@@ -34,6 +45,41 @@ export const AdminPlans = () => {
             console.error(error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchTrialCampaign = async () => {
+        try {
+            const { data } = await api.get('/admin/trial-campaign');
+            setTrialCampaign(data);
+        } catch (error) {
+            console.error('Failed to load trial campaign status:', error);
+        }
+    };
+
+    const handleToggleTrial = async () => {
+        if (!trialCampaign) return;
+        setIsTogglingTrial(true);
+        setTrialMessage(null);
+        try {
+            const nextState = !trialCampaign.active;
+            const { data } = await api.post('/admin/trial-campaign/toggle', {
+                enabled: nextState,
+                days: 30
+            });
+            setTrialCampaign(data);
+            setTrialMessage(
+                nextState
+                    ? 'Campanha de Trial ATIVADA com sucesso! Todos os novos traders sem plano ativo receberão 30 dias de Plano Premium grátis ao acessar o painel.'
+                    : 'Campanha de Trial PAUSADA. Novos trials não serão concedidos automaticamente.'
+            );
+            setTimeout(() => setTrialMessage(null), 7000);
+            fetchPlans();
+        } catch (error) {
+            console.error('Error toggling trial:', error);
+            alert('Falha ao alternar status do período de teste.');
+        } finally {
+            setIsTogglingTrial(false);
         }
     };
 
@@ -93,6 +139,96 @@ export const AdminPlans = () => {
                 <h1 className="text-3xl font-bold text-white">Planos de Assinatura</h1>
             </div>
 
+            {/* Notificação Toast de Alteração de Estado do Trial */}
+            {trialMessage && (
+                <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <CheckCircle2 size={20} className="shrink-0 text-emerald-400" />
+                    <span className="text-sm font-medium">{trialMessage}</span>
+                </div>
+            )}
+
+            {/* CARD INSTITUCIONAL: CAMPANHA DE PERÍODO DE TESTE (TRIAL 30 DIAS) */}
+            <div className="mb-8 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-xl">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+                    <div className="space-y-3 max-w-2xl">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                                <Gift size={20} />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                                Campanha Global de Onboarding
+                            </span>
+                            <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${
+                                trialCampaign?.active 
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                    : 'bg-slate-800 border-slate-700 text-slate-400'
+                            }`}>
+                                <span className={`w-2 h-2 rounded-full ${trialCampaign?.active ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                                {trialCampaign?.active ? 'Campanha Ativa' : 'Pausada'}
+                            </span>
+                        </div>
+
+                        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                            Período de Teste Gratuito (Trial de 30 Dias Premium)
+                        </h2>
+
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                            Quando ativada, qualquer novo trader que acessar o sistema sem um plano ativo recebe 
+                            automaticamente <strong className="text-white font-bold">30 dias de Plano Premium grátis</strong> de forma instantânea, com disparo de e-mail formal de boas-vindas. Usuários que já usufruíram do teste uma vez são bloqueados de receber novamente e direcionados à página de preços.
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1 text-xs text-slate-300">
+                            <div className="flex items-center gap-1.5 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
+                                <ShieldCheck size={14} className="text-emerald-400" />
+                                <span>Plano Concedido: <strong className="text-white">PREMIUM (PRO)</strong></span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
+                                <Clock size={14} className="text-amber-400" />
+                                <span>Duração: <strong className="text-white">{trialCampaign?.trialDays || 30} Dias</strong></span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800">
+                                <Users size={14} className="text-indigo-400" />
+                                <span>Total Beneficiados: <strong className="text-emerald-400 font-bold">{trialCampaign?.totalTrialsGranted ?? 0} traders</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-3 w-full lg:w-auto shrink-0">
+                        <Button
+                            variant={trialCampaign?.active ? "secondary" : "primary"}
+                            onClick={handleToggleTrial}
+                            isLoading={isTogglingTrial}
+                            className={`py-3.5 px-6 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
+                                trialCampaign?.active 
+                                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/10' 
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-emerald-500/20'
+                            }`}
+                        >
+                            {trialCampaign?.active ? (
+                                <>
+                                    <Power size={16} />
+                                    Pausar Período de Teste
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles size={16} />
+                                    Ativar Período de Teste (30 Dias)
+                                </>
+                            )}
+                        </Button>
+                        <span className="text-[11px] text-slate-500 text-center lg:text-right">
+                            {trialCampaign?.active 
+                                ? 'Novos usuários recebem 30 dias automaticamente' 
+                                : 'Novos trials suspensos até nova ativação'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans.map((plan) => (
                     <Card key={plan.id} className="p-6 border-slate-800 bg-slate-900/50">
@@ -123,12 +259,12 @@ export const AdminPlans = () => {
 
                             <div className="flex justify-between text-sm pt-2 border-t border-slate-800">
                                 <span className="text-slate-400">Preço Mensal</span>
-                                <span className="text-white font-medium">MT {plan.monthlyPrice}</span>
+                                <span className="text-white font-medium">$ {plan.monthlyPrice} USD</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-400">Preço Anual (Equiv.)</span>
                                 <span className="text-emerald-400 font-medium">
-                                    MT {(Number(plan.monthlyPrice) * 12 * (1 - Number(plan.annualDiscountPercent) / 100)).toFixed(2)}
+                                    $ {(Number(plan.monthlyPrice) * 12 * (1 - Number(plan.annualDiscountPercent) / 100)).toFixed(2)} USD
                                 </span>
                             </div>
                             <div className="flex justify-between text-sm">

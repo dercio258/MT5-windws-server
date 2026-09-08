@@ -18,6 +18,21 @@ export interface DashboardStats {
     healthScore?: { score: number; details: any };
     bySession?: any[];
     bySymbol?: any[];
+    isConsolidated?: boolean;
+    currencies?: string[];
+    hasMultipleCurrencies?: boolean;
+    accountBreakdown?: any[];
+    targetAccount?: any;
+    propFirmStatus?: {
+        hasRules: boolean;
+        profitTarget: number;
+        profitTargetProgress: number | null;
+        dailyLossLimit: number;
+        todayPnL: number;
+        dailyLossMargin: number | null;
+        maxDrawdownLimit: number;
+        maxDrawdownRecorded: number;
+    } | null;
 }
 
 export const useSubscriptionStatus = () => {
@@ -30,14 +45,20 @@ export const useSubscriptionStatus = () => {
     });
 };
 
-export const useDashboardStats = (startDate: string, endDate: string) => {
+export const useDashboardStats = (startDate: string, endDate: string, accountId?: string) => {
+    const normalizedAccountId = (!accountId || accountId === 'all' || accountId === 'undefined') ? undefined : accountId;
+
     return useQuery<DashboardStats>({
-        queryKey: ['dashboard', 'stats', startDate, endDate],
+        queryKey: ['dashboard', 'stats', normalizedAccountId || 'all', startDate, endDate],
         queryFn: async () => {
-            const params = { startDate, endDate };
+            const params: any = { startDate, endDate };
+            if (normalizedAccountId) {
+                params.accountId = normalizedAccountId;
+            }
+
             const [perfRes, scoreRes] = await Promise.all([
                 api.get('/dashboard/performance', { params }),
-                api.get('/alerts/score')
+                api.get('/alerts/score', { params }).catch(() => ({ data: null }))
             ]);
 
             const data = perfRes.data;
@@ -45,7 +66,7 @@ export const useDashboardStats = (startDate: string, endDate: string) => {
             // Transform data as needed
             const mappedDaily = data.dailyPnL?.map((d: any) => ({
                 date: new Date(d.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-                value: isNaN(Number(d.pnl)) ? 0 : Number(d.pnl)
+                value: isNaN(Number(d.value ?? d.pnl)) ? 0 : Number(d.value ?? d.pnl)
             })) || [];
 
             return {
@@ -56,18 +77,22 @@ export const useDashboardStats = (startDate: string, endDate: string) => {
                     ticket: t.ticket
                 })).reverse() : mappedDaily,
                 distribution: data.distribution || { wins: 0, losses: 0, breakeven: 0 },
-                healthScore: scoreRes.data
+                healthScore: scoreRes?.data
             };
         },
         enabled: !!startDate && !!endDate,
     });
 };
 
-export const useTradesFallback = () => {
+export const useTradesFallback = (accountId?: string) => {
+    const normalizedAccountId = (!accountId || accountId === 'all' || accountId === 'undefined') ? undefined : accountId;
+
     return useQuery({
-        queryKey: ['trades', 'all'],
+        queryKey: ['trades', normalizedAccountId || 'all'],
         queryFn: async () => {
-            const { data } = await api.get('/dashboard/trades');
+            const params: any = {};
+            if (normalizedAccountId) params.accountId = normalizedAccountId;
+            const { data } = await api.get('/dashboard/trades', { params });
             return data;
         },
     });

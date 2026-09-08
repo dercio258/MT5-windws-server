@@ -5,7 +5,6 @@ import {
     Lock,
     Check,
     ArrowRight,
-    TrendingUp,
     AlertCircle,
     Loader2,
     User,
@@ -19,6 +18,9 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
+import { CandlestickHeroBackground } from '../components/landing/CandlestickBackground';
+
+const TOREX_ICON = "https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png";
 
 // --- Type Definitions ---
 interface Country {
@@ -48,21 +50,21 @@ const Input = ({ label, icon, type = "text", error, ...props }: any) => {
 
     return (
         <div className="space-y-1.5 group">
-            <label className={`text-sm font-medium transition-colors ${isFocused ? 'text-emerald-400' : 'text-slate-400'}`}>
+            <label className={`text-xs font-semibold uppercase tracking-wider transition-colors ${isFocused ? 'text-emerald-400' : 'text-[#9CA3AF]'}`}>
                 {label}
             </label>
-            <div className={`relative flex items-center bg-slate-900/50 border rounded-xl transition-all duration-300 ${error
-                ? 'border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.2)]'
+            <div className={`relative flex items-center bg-[#08090C]/80 border rounded-xl transition-all duration-300 ${error
+                ? 'border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
                 : isFocused
-                    ? 'border-emerald-500/50 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]'
-                    : 'border-slate-800 hover:border-slate-700'
+                    ? 'border-emerald-500/60 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
+                    : 'border-white/[0.08] hover:border-white/[0.16]'
                 }`}>
-                <div className={`pl-4 pr-3 ${isFocused ? 'text-emerald-400' : 'text-slate-500'}`}>
+                <div className={`pl-4 pr-3 ${isFocused ? 'text-emerald-400' : 'text-[#6B7280]'}`}>
                     {icon}
                 </div>
                 <input
                     type={inputType}
-                    className="w-full bg-transparent border-none text-slate-100 placeholder:text-slate-600 focus:ring-0 py-3.5 pl-0 pr-4 text-sm font-medium outline-none"
+                    className="w-full bg-transparent border-none text-[#F3F4F6] placeholder:text-[#6B7280] focus:ring-0 py-3.5 pl-0 pr-4 text-sm font-medium outline-none focus:outline-none"
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     {...props}
@@ -71,14 +73,14 @@ const Input = ({ label, icon, type = "text", error, ...props }: any) => {
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 text-slate-500 hover:text-slate-300 transition-colors"
+                        className="absolute right-4 text-[#6B7280] hover:text-[#F3F4F6] transition-colors"
                     >
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                 )}
             </div>
             {error && (
-                <div className="flex items-center gap-1.5 text-red-400 text-xs animate-in slide-in-from-left-1">
+                <div className="flex items-center gap-1.5 text-rose-400 text-xs animate-in slide-in-from-left-1">
                     <AlertCircle size={12} />
                     <span>{error}</span>
                 </div>
@@ -103,7 +105,6 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
                 const sorted = data.sort((a: Country, b: Country) => a.name.common.localeCompare(b.name.common));
                 setCountries(sorted);
 
-                // Default to Brazil if found, else first one
                 const br = sorted.find((c: Country) => c.cca2 === 'BR');
                 if (br) {
                     setSelectedCountry(br);
@@ -115,7 +116,6 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
         };
         fetchCountries();
 
-        // Click outside handler
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setShowDropdown(false);
@@ -141,36 +141,36 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
 
     return (
         <div className="space-y-1.5 group relative" ref={dropdownRef}>
-            <label className={`text-sm font-medium transition-colors ${isFocused ? 'text-emerald-400' : 'text-slate-400'}`}>
+            <label className={`text-xs font-semibold uppercase tracking-wider transition-colors ${isFocused ? 'text-emerald-400' : 'text-[#9CA3AF]'}`}>
                 {label}
             </label>
-            <div className={`relative flex items-center bg-slate-900/50 border rounded-xl transition-all duration-300 ${error
-                ? 'border-red-500/50'
+            <div className={`relative flex items-center bg-[#08090C]/80 border rounded-xl transition-all duration-300 ${error
+                ? 'border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
                 : isFocused
-                    ? 'border-emerald-500/50 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]'
-                    : 'border-slate-800 hover:border-slate-700'
+                    ? 'border-emerald-500/60 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
+                    : 'border-white/[0.08] hover:border-white/[0.16]'
                 }`}>
 
                 {/* Country Selector Button */}
                 <button
                     type="button"
                     onClick={() => setShowDropdown(!showDropdown)}
-                    className="flex items-center gap-2 pl-4 pr-3 border-r border-slate-700 text-slate-300 hover:text-white transition-colors h-full py-3.5 min-w-[100px]"
+                    className="flex items-center gap-2 pl-4 pr-3 border-r border-white/[0.08] text-[#F3F4F6] hover:text-white transition-colors h-full py-3.5 min-w-[100px]"
                 >
                     {selectedCountry ? (
                         <>
                             <img src={selectedCountry.flags.svg} alt={selectedCountry.name.common} className="w-5 h-3.5 object-cover rounded-sm" />
-                            <span className="text-sm font-medium">{getDialCode(selectedCountry)}</span>
+                            <span className="text-xs sm:text-sm font-mono font-medium">{getDialCode(selectedCountry)}</span>
                         </>
                     ) : (
-                        <Globe size={18} className="text-emerald-500" />
+                        <Globe size={18} className="text-emerald-400" />
                     )}
-                    <ChevronDown size={14} className={`text-slate-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={14} className={`text-[#6B7280] transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                 </button>
 
                 <input
                     type="tel"
-                    className="w-full bg-transparent border-none text-slate-100 placeholder:text-slate-600 focus:ring-0 py-3.5 px-4 text-sm font-medium outline-none"
+                    className="w-full bg-transparent border-none text-[#F3F4F6] placeholder:text-[#6B7280] focus:ring-0 py-3.5 px-4 text-sm font-medium outline-none focus:outline-none"
                     placeholder="99999-9999"
                     value={value}
                     onChange={onChange}
@@ -181,14 +181,14 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
 
             {/* Dropdown Menu */}
             {showDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-72 max-h-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col animate-in fade-in zoom-in-95 duration-200">
-                    <div className="p-2 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                <div className="absolute top-full left-0 mt-2 w-72 max-h-80 bg-[#0E1017] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-2.5 border-b border-white/[0.08] sticky top-0 bg-[#0E1017] z-10">
                         <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
                             <input
                                 type="text"
                                 placeholder="Buscar país..."
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-1.5 pl-9 pr-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                                className="w-full bg-[#08090C] border border-white/[0.08] rounded-lg py-1.5 pl-9 pr-3 text-xs text-[#F3F4F6] focus:outline-none focus:border-emerald-500/50"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 autoFocus
@@ -200,15 +200,15 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
                             <button
                                 key={country.cca2 + idx}
                                 onClick={() => handleCountrySelect(country)}
-                                className="w-full flex items-center gap-3 p-2 hover:bg-slate-800 rounded-lg transition-colors text-left"
+                                className="w-full flex items-center gap-3 p-2 hover:bg-[#111319] rounded-lg transition-colors text-left"
                             >
                                 <img src={country.flags.svg} alt={country.name.common} className="w-6 h-4 object-cover rounded-sm shadow-sm" />
-                                <span className="text-xs font-medium text-slate-200 flex-1 truncate">{country.name.common}</span>
-                                <span className="text-xs text-slate-500 font-mono">{getDialCode(country)}</span>
+                                <span className="text-xs font-medium text-[#F3F4F6] flex-1 truncate">{country.name.common}</span>
+                                <span className="text-xs text-emerald-400 font-mono">{getDialCode(country)}</span>
                             </button>
                         ))}
                         {filteredCountries.length === 0 && (
-                            <div className="p-4 text-center text-xs text-slate-500">Nenhum país encontrado</div>
+                            <div className="p-4 text-center text-xs text-[#6B7280]">Nenhum país encontrado</div>
                         )}
                     </div>
                 </div>
@@ -219,13 +219,13 @@ const PhoneInput = ({ label, value, onChange, error, onCountryChange }: any) => 
 
 const Checkbox = ({ checked, onChange, label }: any) => (
     <label className="flex items-start gap-3 cursor-pointer group select-none">
-        <div className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-200 flex-shrink-0 ${checked
-            ? 'bg-emerald-500 border-emerald-500 text-slate-900'
-            : 'bg-slate-900/50 border-slate-700 group-hover:border-slate-600'
+        <div className={`mt-0.5 w-5 h-5 rounded-lg border flex items-center justify-center transition-all duration-200 flex-shrink-0 ${checked
+            ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+            : 'bg-[#08090C]/80 border-white/[0.12] group-hover:border-emerald-500/40'
             }`}>
-            {checked && <Check size={14} strokeWidth={4} />}
+            {checked && <Check size={13} strokeWidth={3.5} />}
         </div>
-        <span className={`text-sm leading-tight transition-colors ${checked ? 'text-slate-300' : 'text-slate-500 group-hover:text-slate-400'}`}>
+        <span className={`text-xs sm:text-sm leading-relaxed transition-colors ${checked ? 'text-[#F3F4F6]' : 'text-[#9CA3AF] group-hover:text-[#F3F4F6]'}`}>
             {label}
         </span>
         <input type="checkbox" className="hidden" checked={checked} onChange={e => onChange(e.target.checked)} />
@@ -233,17 +233,17 @@ const Checkbox = ({ checked, onChange, label }: any) => (
 );
 
 const RegisterButton = ({ children, isLoading, variant = 'primary', className = '', ...props }: any) => {
-    const baseStyles = "relative w-full h-12 rounded-xl font-bold transition-all duration-300 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed active:scale-[0.98]";
+    const baseStyles = "relative w-full h-12 rounded-xl font-bold transition-all duration-300 flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]";
 
     const variants: any = {
-        primary: "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-900/20 border border-transparent",
-        outline: "bg-transparent border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white"
+        primary: "bg-[#10B981] hover:bg-[#34D399] text-[#04110C] shadow-md hover:shadow-[0_0_24px_rgba(16,185,129,0.30)] border border-transparent",
+        outline: "bg-[#111319] hover:bg-[#161822] border border-white/[0.08] hover:border-emerald-500/30 text-[#9CA3AF] hover:text-[#F3F4F6]"
     };
 
     return (
         <button className={`${baseStyles} ${variants[variant]} ${className}`} disabled={isLoading} {...props}>
             {isLoading ? (
-                <Loader2 className="animate-spin text-white/80" size={20} />
+                <Loader2 className="animate-spin text-current" size={20} />
             ) : (
                 children
             )}
@@ -375,48 +375,45 @@ export const Register = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 font-sans relative overflow-hidden">
+        <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex items-center justify-center p-4 md:p-6 font-sans relative overflow-hidden isolate">
+            {/* Candlestick Trading Background */}
+            <CandlestickHeroBackground opacity="opacity-50 sm:opacity-65" />
 
-            {/* Logo Absolute */}
-            <div className="absolute top-6 left-6 md:top-8 md:left-8 z-20 flex items-center gap-3">
+            {/* Ambient Radial Glow */}
+            <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
+            <div className="absolute bottom-[0%] left-[0%] w-[45%] h-[45%] bg-teal-500/8 rounded-full blur-[120px] pointer-events-none" />
+
+            {/* Logo Absolute Top-Left */}
+            <Link to="/" className="absolute top-6 left-6 md:top-8 md:left-8 z-30 flex items-center gap-3 group cursor-pointer">
                 <img
-                    src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
-                    alt="Logo"
-                    className="w-10 h-10 object-contain drop-shadow-lg"
+                    src={TOREX_ICON}
+                    alt="Torex Journal Logo"
+                    className="w-10 h-10 object-contain drop-shadow-md group-hover:scale-105 transition-transform"
                 />
-                <span className="font-bold text-xl tracking-tight text-white">
+                <span className="font-bold text-xl tracking-tight text-[#F3F4F6]">
                     TOREX <span className="text-emerald-400">JOURNAL</span>
                 </span>
-            </div>
+            </Link>
 
-            {/* Background Ambience */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[10%] right-[10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[10%] left-[0%] w-[50%] h-[50%] bg-teal-500/5 rounded-full blur-[100px]" />
-                {/* Grid Pattern */}
-                <div
-                    className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                        backgroundImage: 'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-                        backgroundSize: '40px 40px'
-                    }}
-                />
-            </div>
-
-            <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-24 items-center relative z-10">
+            <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-20 items-center relative z-20 pt-16 lg:pt-0">
 
                 {/* Left Column (Form) - Inverted relative to login for dynamism */}
                 <div className="w-full max-w-md mx-auto order-2 lg:order-1">
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 p-8 md:p-10 rounded-3xl shadow-2xl relative group">
+                    <div className="bg-[#0E1017]/85 backdrop-blur-2xl border border-white/[0.08] p-8 md:p-10 rounded-3xl shadow-2xl relative group">
                         {/* Glow Effect on Hover */}
-                        <div className="absolute -inset-0.5 bg-gradient-to-br from-emerald-500/20 to-slate-800/0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-sm" />
+                        <div className="absolute -inset-0.5 bg-gradient-to-b from-emerald-500/25 to-teal-500/5 rounded-3xl opacity-60 pointer-events-none -z-10 blur-sm" />
 
                         <div className="flex flex-col items-center mb-6">
-                            <h2 className="text-2xl font-bold text-white">Crie sua conta</h2>
-                            <p className="text-slate-400 text-sm mt-2">Teste gratuitamente por 14 dias. Sem compromisso.</p>
+                            <img
+                                src={TOREX_ICON}
+                                alt="Torex Journal Logo"
+                                className="w-12 h-12 object-contain drop-shadow-md mb-3"
+                            />
+                            <h2 className="text-2xl font-black text-[#F3F4F6] tracking-tight">Crie sua conta</h2>
+                            <p className="text-[#9CA3AF] text-sm mt-1.5 text-center">Teste gratuitamente por 14 dias. Sem compromisso.</p>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <Input
                                 name="name"
                                 label="Nome Completo"
@@ -455,9 +452,9 @@ export const Register = () => {
                                     type="button"
                                     onClick={handleSendOtp}
                                     disabled={isLoading || otpTimer > 0 || !formData.email}
-                                    className={`h-[50px] px-4 rounded-xl font-medium text-sm transition-all border ${otpTimer > 0
-                                        ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                                    className={`h-[48px] px-4 rounded-xl font-semibold text-xs sm:text-sm transition-all border shrink-0 ${otpTimer > 0
+                                        ? 'bg-[#111319] text-[#6B7280] border-white/[0.08] cursor-not-allowed'
+                                        : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25 active:scale-95'
                                         }`}
                                 >
                                     {otpTimer > 0 ? `${otpTimer}s` : (otpSent ? 'Reenviar' : 'Enviar Código')}
@@ -481,42 +478,42 @@ export const Register = () => {
                                     value={formData.password}
                                     onChange={handleChange}
                                 />
-                                <p className="text-[10px] text-slate-500 text-right px-1">Mínimo de 6 caracteres</p>
+                                <p className="text-[10px] text-[#6B7280] text-right font-mono px-1">Mínimo de 6 caracteres</p>
                             </div>
 
                             {error && (
-                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm animate-in slide-in-from-top-2">
-                                    <AlertCircle size={18} />
-                                    {error}
+                                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-center gap-3 text-rose-400 text-xs sm:text-sm animate-pulse">
+                                    <AlertCircle size={18} className="shrink-0" />
+                                    <span>{error}</span>
                                 </div>
                             )}
 
-                            <div className="pt-2">
+                            <div className="pt-1">
                                 <Checkbox
-                                    label={<span>Aceito os <a href="#" className="text-emerald-400 hover:text-emerald-300 font-medium hover:underline">Termos de Uso</a> e a <a href="#" className="text-emerald-400 hover:text-emerald-300 font-medium hover:underline">Política de Privacidade</a>.</span>}
+                                    label={<span>Aceito os <a href="#" className="text-emerald-400 hover:text-emerald-300 font-semibold hover:underline">Termos de Uso</a> e a <a href="#" className="text-emerald-400 hover:text-emerald-300 font-semibold hover:underline">Política de Privacidade</a>.</span>}
                                     checked={terms}
                                     onChange={setTerms}
                                 />
                             </div>
 
                             <RegisterButton type="submit" isLoading={isLoading}>
-                                Criar Conta Gratuita <ArrowRight size={18} className="ml-2 opacity-80" />
+                                Criar Conta Gratuita <ArrowRight size={18} className="ml-2 opacity-90" />
                             </RegisterButton>
 
                             <div className="relative my-6">
                                 <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-slate-800"></div>
+                                    <div className="w-full border-t border-white/[0.08]"></div>
                                 </div>
                                 <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-slate-900 px-4 text-slate-500 font-medium">Ou continue com</span>
+                                    <span className="bg-[#0E1017] px-4 text-[#6B7280] font-semibold tracking-wider">Ou continue com</span>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3.5">
                                 <RegisterButton 
                                     type="button"
                                     variant="outline" 
-                                    className="h-10 text-sm font-medium"
+                                    className="h-11 text-xs sm:text-sm font-semibold"
                                     onClick={() => {
                                         window.location.href = '/api/auth/google';
                                     }}
@@ -526,7 +523,7 @@ export const Register = () => {
                                 <RegisterButton 
                                     type="button"
                                     variant="outline" 
-                                    className="h-10 text-sm font-medium"
+                                    className="h-11 text-xs sm:text-sm font-semibold"
                                     onClick={() => {
                                         window.location.href = '/api/auth/github';
                                     }}
@@ -536,10 +533,10 @@ export const Register = () => {
                             </div>
                         </form>
 
-                        <div className="mt-8 text-center">
-                            <p className="text-slate-400 text-sm">
+                        <div className="mt-7 text-center">
+                            <p className="text-[#9CA3AF] text-sm">
                                 Já tem uma conta?
-                                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-bold ml-1 transition-colors">
+                                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-bold ml-1.5 transition-colors">
                                     Fazer Login
                                 </Link>
                             </p>
@@ -549,46 +546,46 @@ export const Register = () => {
 
                 {/* Right Column (Marketing/Brand) */}
                 <div className="hidden lg:block space-y-8 pl-8 order-1 lg:order-2">
-                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-8">
-                        <TrendingUp className="text-white w-8 h-8" />
-                    </div>
+                    <img
+                        src={TOREX_ICON}
+                        alt="Torex Logo"
+                        className="w-16 h-16 object-contain drop-shadow-2xl mb-6"
+                    />
 
-                    <h1 className="text-5xl font-extrabold text-white leading-tight">
-                        Comece sua jornada rumo à <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">profissionalização.</span>
+                    <h1 className="text-5xl font-black text-[#F3F4F6] tracking-tight leading-[1.15]">
+                        Comece sua jornada rumo à <span className="text-emerald-400">profissionalização.</span>
                     </h1>
 
-                    <div className="space-y-6 pt-4">
+                    <div className="space-y-4 pt-4">
                         {[
                             "Sincronização automática com MT4/MT5",
-                            "Análise detalhada de performance",
-                            "Diário emocional integrado",
-                            "Gestão de risco automatizada"
+                            "Análise detalhada de performance quantitativa",
+                            "Diário emocional e psicológico integrado",
+                            "Gestão de risco institucional automatizada"
                         ].map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-4 group">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/20 group-hover:border-emerald-500/40 transition-colors">
+                            <div key={idx} className="flex items-center gap-3.5 group">
+                                <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
                                     <Check size={14} className="text-emerald-400" strokeWidth={3} />
                                 </div>
-                                <span className="text-slate-300 font-medium text-lg">{item}</span>
+                                <span className="text-[#F3F4F6] font-medium text-base">{item}</span>
                             </div>
                         ))}
                     </div>
 
                     {/* Social Proof Mini */}
-                    <div className="pt-8 border-t border-slate-800/50 mt-8">
-                        <div className="flex items-center gap-4">
-                            <div className="flex -space-x-3">
-                                {[1, 2, 3, 4].map(i => (
-                                    <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-950 bg-slate-800 flex items-center justify-center text-xs font-bold text-white">
-                                        {String.fromCharCode(64 + i)}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="text-sm">
-                                <div className="flex gap-1 text-yellow-500 mb-0.5">
-                                    {[1, 2, 3, 4, 5].map(s => <span key={s} className="fill-current">★</span>)}
+                    <div className="pt-6 border-t border-white/[0.08] mt-8 flex items-center gap-4">
+                        <div className="flex -space-x-3">
+                            {['#10B981', '#34D399', '#059669', '#047857'].map((_, i) => (
+                                <div key={i} className="w-9 h-9 rounded-full border-2 border-[#08090C] bg-[#111319] flex items-center justify-center text-xs font-bold text-emerald-400 shadow-sm">
+                                    {String.fromCharCode(65 + i)}
                                 </div>
-                                <p className="text-slate-400"><span className="text-white font-bold">4.9/5</span> de avaliações de traders.</p>
+                            ))}
+                        </div>
+                        <div className="text-xs">
+                            <div className="flex gap-1 text-amber-400 mb-1">
+                                {[1, 2, 3, 4, 5].map(s => <span key={s} className="fill-current">★</span>)}
                             </div>
+                            <p className="text-[#9CA3AF]"><span className="text-[#F3F4F6] font-bold">4.9/5</span> de avaliações de traders ativos.</p>
                         </div>
                     </div>
                 </div>

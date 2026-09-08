@@ -92,18 +92,18 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
     const off = gradientOffset();
 
     return (
-        <div className="bg-[#080a0c] border border-slate-800 rounded-lg p-6 relative overflow-hidden flex flex-col h-full shadow-lg hover:border-slate-700 transition-colors duration-500 group font-mono uppercase tracking-widest">
+        <div className="bg-transparent w-full relative overflow-hidden flex flex-col h-full font-sans">
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-slate-100 flex items-center gap-2 text-xs tracking-widest">
-                    <TrendingUp className="text-emerald-500" size={16} /> P&L TRACKER
+            <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-xs tracking-wider uppercase">
+                    <TrendingUp className="text-emerald-400" size={16} /> Performance Diária de PnL
                 </h3>
                 <div className="flex gap-4">
-                     <div className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> PROFIT
+                     <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span> PROFIT
                     </div>
-                     <div className="flex items-center gap-1.5 text-[10px] text-rose-500 font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> LOSS
+                     <div className="flex items-center gap-1.5 text-[10px] text-rose-400 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span> LOSS
                     </div>
                 </div>
             </div>
@@ -114,12 +114,12 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                     <defs>
                         <linearGradient id="splitGradient" x1="0" y1="0" x2="0" y2="1">
                             {/* Profit Area (Green) */}
-                            <stop offset={0} stopColor="#10b981" stopOpacity="0.15" />
+                            <stop offset={0} stopColor="#10b981" stopOpacity="0.18" />
                             <stop offset={off} stopColor="#10b981" stopOpacity="0" />
                             
                             {/* Loss Area (Red) */}
                             <stop offset={off} stopColor="#f43f5e" stopOpacity="0" />
-                            <stop offset={1} stopColor="#f43f5e" stopOpacity="0.15" />
+                            <stop offset={1} stopColor="#f43f5e" stopOpacity="0.18" />
                         </linearGradient>
                          <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
                             <stop offset={0} stopColor="#10b981" stopOpacity="1" />
@@ -129,14 +129,14 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                         </linearGradient>
                     </defs>
 
-                    {/* Grid Lines (Rigid/Technical) */}
+                    {/* Grid Lines (Refined Dark Fintech) */}
                     {[0, 0.25, 0.5, 0.75, 1].map(t => {
                         const y = padding.top + t * chartHeight;
                         return (
                             <line
                                 key={t}
                                 x1={padding.left} y1={y} x2={width - padding.right} y2={y}
-                                stroke="#1e293b" strokeWidth="1" strokeDasharray="2 2" strokeOpacity="0.4"
+                                stroke="rgba(148, 163, 184, 0.08)" strokeWidth="1" strokeDasharray="3 3"
                             />
                         );
                     })}
@@ -144,7 +144,7 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                     {/* Zero Line - Highlighted */}
                     <line
                         x1={padding.left} y1={zeroY} x2={width - padding.right} y2={zeroY}
-                        stroke="#475569" strokeWidth="1" strokeDasharray="4 4" strokeOpacity="0.6"
+                        stroke="rgba(148, 163, 184, 0.22)" strokeWidth="1.2" strokeDasharray="4 4"
                     />
 
                     {/* Left Axis Labels - HFT Style */}
@@ -157,7 +157,7 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                             fontSize="9"
                             textAnchor="end"
                             dominantBaseline="middle"
-                            className="font-mono tracking-tighter"
+                            className="font-mono tracking-tight"
                         >
                             {Math.abs(val) >= 1000 ? `${(val / 1000).toFixed(1)}k` : val.toFixed(0)}
                         </text>
@@ -175,10 +175,10 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                         d={pathD}
                         fill="none"
                         stroke="url(#splitStroke)"
-                        strokeWidth="1.5"
-                        strokeLinecap="square"
-                        strokeLinejoin="miter"
-                        className="drop-shadow-[0_0_8px_rgba(16,185,129,0.1)]"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]"
                     />
 
                     {/* Interactive Points - High Density Optimization */}
@@ -195,14 +195,13 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                                 className="cursor-crosshair"
                             />
                             
-                            {/* Visible Square Dot (HFT/Technical feel) */}
-                            <rect
-                                x={p.x - (hoveredIndex === i ? 3 : 1.5)}
-                                y={p.y - (hoveredIndex === i ? 3 : 1.5)}
-                                width={hoveredIndex === i ? 6 : 3}
-                                height={hoveredIndex === i ? 6 : 3}
+                            {/* Visible Dot */}
+                            <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r={hoveredIndex === i ? 4 : 2}
                                 fill={p.value >= 0 ? '#10b981' : '#f43f5e'}
-                                className={`transition-all duration-75 ${hoveredIndex === i ? 'opacity-100' : 'opacity-80'}`}
+                                className={`transition-all duration-75 ${hoveredIndex === i ? 'opacity-100' : 'opacity-75'}`}
                             />
 
                             {/* Vertical Crosshair Line on Hover */}
@@ -210,42 +209,42 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                                 <line 
                                     x1={p.x} y1={padding.top} 
                                     x2={p.x} y2={height - padding.bottom} 
-                                    stroke="#334155" strokeWidth="1" strokeDasharray="2 2"
+                                    stroke="rgba(148, 163, 184, 0.25)" strokeWidth="1" strokeDasharray="2 2"
                                 />
                             )}
                         </g>
                     ))}
 
-                    {/* Binary Tooltip - Industrial Style */}
+                    {/* Binary Tooltip - Dark Fintech Card */}
                     {hoveredIndex !== null && (
                         <g transform={`translate(${Math.min(points[hoveredIndex].x, width - 150)}, ${Math.max(padding.top, Math.min(points[hoveredIndex].y - 50, height - 80))})`}>
-                            {/* Tooltip Bg - Sharp corners */}
+                            {/* Tooltip Bg - Rounded card with subtle border */}
                             <rect
-                                x="0" y="0" width="140" height="55"
-                                fill="#0f172a" 
-                                stroke={points[hoveredIndex].value >= 0 ? "#10b981" : "#f43f5e"} 
+                                x="0" y="0" width="140" height="55" rx="8"
+                                fill="#111319" 
+                                stroke={points[hoveredIndex].value >= 0 ? "rgba(16, 185, 129, 0.5)" : "rgba(244, 63, 94, 0.5)"} 
                                 strokeWidth="1"
-                                className="drop-shadow-2xl opacity-95"
+                                className="drop-shadow-2xl opacity-98"
                             />
                             
                             {/* Status Label */}
                             <text
                                 x="10" y="18"
-                                fill={points[hoveredIndex].value >= 0 ? "#10b981" : "#f43f5e"}
+                                fill={points[hoveredIndex].value >= 0 ? "#34d399" : "#fb7185"}
                                 fontSize="9"
                                 fontWeight="bold"
-                                className="tracking-widest uppercase font-mono"
+                                className="tracking-wider uppercase font-mono"
                             >
-                                {points[hoveredIndex].value >= 0 ? "PROFIT STATUS" : "LOSS STATUS"}
+                                {points[hoveredIndex].value >= 0 ? "PROFIT" : "LOSS"}
                             </text>
 
                             {/* Value */}
                             <text
                                 x="10" y="40"
-                                fill="#e2e8f0"
-                                fontSize="16"
+                                fill="#f8fafc"
+                                fontSize="15"
                                 fontWeight="bold"
-                                className="tracking-widest font-mono"
+                                className="font-mono tracking-tight"
                             >
                                 ${points[hoveredIndex].value.toFixed(2)}
                             </text>
@@ -264,7 +263,7 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                             {/* Date */}
                              <text
                                 x="130" y="40"
-                                fill="#475569"
+                                fill="#94a3b8"
                                 fontSize="9"
                                 textAnchor="end"
                                 className="font-mono"
@@ -276,7 +275,7 @@ export const DailyPnLChart = ({ data }: PnLChartProps) => {
                 </svg>
 
                 {/* X Axis Labels - Technical/Minimal */}
-                <div className="absolute bottom-0 left-[60px] right-[30px] flex justify-between text-[9px] text-slate-600 font-mono pt-2 border-t border-slate-800/50 uppercase tracking-wider">
+                <div className="absolute bottom-0 left-[60px] right-[30px] flex justify-between text-[9px] text-slate-500 font-mono pt-2 border-t border-[rgba(148,163,184,0.08)] uppercase tracking-wider">
                     {data.filter((_, i) => i === 0 || i === data.length - 1 || i % Math.ceil(data.length / 5) === 0).map((d, i) => (
                         <span key={i}>{d.date.split(' ')[0]}</span>
                     ))}

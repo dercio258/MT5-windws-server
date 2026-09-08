@@ -1,32 +1,1003 @@
-import { useNavigate } from 'react-router-dom';
-import { Lock, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+    BarChart3, Calendar, Download, Printer, Briefcase, TrendingUp, 
+    TrendingDown, Percent, Activity, ShieldAlert,
+    Clock, Layers, PieChart, ChevronLeft, ChevronRight,
+    Search
+} from 'lucide-react';
+import { useAccount } from '../context/AccountContext';
+import { Button } from '../components/ui/Button';
+import api from '../api';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    ArcElement,
+    Title,
+    Tooltip as ChartTooltip,
+    Legend as ChartLegend,
+    Filler
+} from 'chart.js';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    ArcElement,
+    Title,
+    ChartTooltip,
+    ChartLegend,
+    Filler
+);
+
+const SESSION_COLORS = [
+    { bg: '#38bdf8', border: '#0284c7' }, // Sky Blue (London)
+    { bg: '#818cf8', border: '#4f46e5' }, // Indigo (New York)
+    { bg: '#f59e0b', border: '#d97706' }, // Amber (Asia)
+    { bg: '#10b981', border: '#059669' }, // Emerald (Overlap)
+    { bg: '#ec4899', border: '#db2777' }, // Pink
+    { bg: '#a855f7', border: '#9333ea' }  // Purple
+];
 
 export const Reports = () => {
-    const navigate = useNavigate();
+    const { selectedAccountId, selectedAccount, accounts, isConsolidated, selectAccount } = useAccount();
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const [loading, setLoading] = useState(true);
+    const [period, setPeriod] = useState<'all' | 'today' | '7d' | '30d' | 'this_month' | 'custom'>('30d');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [symbolFilter, setSymbolFilter] = useState('ALL');
+    const [typeFilter, setTypeFilter] = useState('ALL');
+    const [reportData, setReportData] = useState<any>(null);
+    const [executionChartMode, setExecutionChartMode] = useState<'executions' | 'cumulative'>('executions');
+
+    // Trade ledger search and pagination
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 15;
+
+    // Calculate dates based on period filter
+    useEffect(() => {
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+
+        if (period === 'today') {
+            setStartDate(todayStr);
+            setEndDate(todayStr);
+        } else if (period === '7d') {
+            const past = new Date();
+            past.setDate(now.getDate() - 7);
+            setStartDate(past.toISOString().split('T')[0]);
+            setEndDate(todayStr);
+        } else if (period === '30d') {
+            const past = new Date();
+            past.setDate(now.getDate() - 30);
+            setStartDate(past.toISOString().split('T')[0]);
+            setEndDate(todayStr);
+        } else if (period === 'this_month') {
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            setStartDate(firstDay.toISOString().split('T')[0]);
+            setEndDate(todayStr);
+        } else if (period === 'all') {
+            setStartDate('');
+            setEndDate('');
+        }
+    }, [period]);
+
+    // Fetch report data whenever filters or active account change
+    useEffect(() => {
+        fetchReport();
+    }, [selectedAccountId, startDate, endDate, symbolFilter, typeFilter]);
+
+    const fetchReport = async () => {
+        try {
+            setLoading(true);
+            const params: any = {};
+            if (selectedAccountId && selectedAccountId !== 'all') {
+                params.accountId = selectedAccountId;
+            }
+            if (startDate) params.startDate = `${startDate}T00:00:00.000Z`;
+            if (endDate) params.endDate = `${endDate}T23:59:59.999Z`;
+            if (symbolFilter !== 'ALL') params.symbol = symbolFilter;
+            if (typeFilter !== 'ALL') params.type = typeFilter;
+
+            const res = await api.get('/dashboard/report', { params });
+            if (res.data) {
+                setReportData(res.data);
+                setCurrentPage(1);
+            }
+        } catch (error) {
+            console.error('Falha ao carregar relatório:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Export CSV
+    const handleExportCSV = () => {
+        if (!reportData || !reportData.trades || reportData.trades.length === 0) return;
+
+        const headers = ['Ticket', 'Conta', 'Símbolo', 'Tipo', 'Volume', 'Preço Abertura', 'Preço Fechamento', 'Lucro Líquido', 'Data Abertura', 'Data Fechamento', 'Sessão'];
+        const rows = reportData.trades.map((t: any) => [
+            t.ticket,
+            t.accountName || '',
+            t.symbol,
+            t.type,
+            t.volume,
+            t.openPrice,
+            t.closePrice,
+            t.netPnl,
+            t.openTime ? new Date(t.openTime).toLocaleString('pt-BR') : '',
+            t.closeTime ? new Date(t.closeTime).toLocaleString('pt-BR') : '',
+            t.session || ''
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `relatorio_trading_${selectedAccount?.name || 'consolidado'}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    // Filter trades for the ledger
+    const filteredTrades = useMemo(() => {
+        if (!reportData?.trades) return [];
+        if (!searchTerm) return reportData.trades;
+        const term = searchTerm.toLowerCase();
+        return reportData.trades.filter((t: any) => 
+            t.symbol?.toLowerCase().includes(term) ||
+            String(t.ticket).includes(term) ||
+            t.type?.toLowerCase().includes(term) ||
+            t.accountName?.toLowerCase().includes(term)
+        );
+    }, [reportData?.trades, searchTerm]);
+
+    const paginatedTrades = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredTrades.slice(start, start + pageSize);
+    }, [filteredTrades, currentPage]);
+
+    const totalPages = Math.ceil(filteredTrades.length / pageSize) || 1;
+
+    // Available symbols from report data
+    const availableSymbols = useMemo(() => {
+        if (!reportData?.bySymbol) return [];
+        return reportData.bySymbol.map((s: any) => s.symbol);
+    }, [reportData?.bySymbol]);
+
+    // Chart.js: Execuções / Operações com loss abaixo de zero (Bar Chart)
+    const executionsBarData = useMemo(() => {
+        if (!reportData?.equityCurve || reportData.equityCurve.length === 0) return null;
+
+        const labels = reportData.equityCurve.map((pt: any, idx: number) => {
+            return pt.time ? `${pt.time}` : `#${idx + 1}`;
+        });
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: 'Resultado ($)',
+                    data: reportData.equityCurve.map((pt: any) => pt.pnl),
+                    backgroundColor: reportData.equityCurve.map((pt: any) => 
+                        pt.pnl >= 0 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(244, 63, 94, 0.85)'
+                    ),
+                    hoverBackgroundColor: reportData.equityCurve.map((pt: any) => 
+                        pt.pnl >= 0 ? '#10b981' : '#f43f5e'
+                    ),
+                    borderColor: reportData.equityCurve.map((pt: any) => 
+                        pt.pnl >= 0 ? '#059669' : '#e11d48'
+                    ),
+                    borderWidth: 1,
+                    borderRadius: 2
+                }
+            ]
+        };
+    }, [reportData?.equityCurve]);
+
+    // Chart.js: Curva de Lucro Acumulado (Line Chart)
+    const cumulativeLineData = useMemo(() => {
+        if (!reportData?.equityCurve || reportData.equityCurve.length === 0) return null;
+
+        const labels = reportData.equityCurve.map((pt: any, idx: number) => {
+            return pt.time ? `${pt.time}` : `#${idx + 1}`;
+        });
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: 'Lucro Acumulado ($)',
+                    data: reportData.equityCurve.map((pt: any) => pt.cumulativePnL),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    borderWidth: 2,
+                    fill: true,
+                    pointRadius: reportData.equityCurve.length > 50 ? 0 : 2.5,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: '#10b981',
+                    tension: 0.25
+                }
+            ]
+        };
+    }, [reportData?.equityCurve]);
+
+    // Chart.js: Distribuição Diária de Resultados (dias com loss abaixo de zero)
+    const dailyPnLChartData = useMemo(() => {
+        if (!reportData?.dailyPnL || reportData.dailyPnL.length === 0) return null;
+
+        const labels = reportData.dailyPnL.map((d: any) => {
+            const parts = d.date.split('-');
+            return parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.date;
+        });
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: 'P&L Diário ($)',
+                    data: reportData.dailyPnL.map((d: any) => d.pnl),
+                    backgroundColor: reportData.dailyPnL.map((d: any) => 
+                        d.pnl >= 0 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(244, 63, 94, 0.85)'
+                    ),
+                    hoverBackgroundColor: reportData.dailyPnL.map((d: any) => 
+                        d.pnl >= 0 ? '#10b981' : '#f43f5e'
+                    ),
+                    borderColor: reportData.dailyPnL.map((d: any) => 
+                        d.pnl >= 0 ? '#059669' : '#e11d48'
+                    ),
+                    borderWidth: 1,
+                    borderRadius: 3
+                }
+            ]
+        };
+    }, [reportData?.dailyPnL]);
+
+    // Chart.js: Gráfico de Pizza para Eficiência por Sessão
+    const sessionPieChartData = useMemo(() => {
+        if (!reportData?.bySession || reportData.bySession.length === 0) return null;
+
+        return {
+            labels: reportData.bySession.map((s: any) => s.session?.toUpperCase() || 'GERAL'),
+            datasets: [
+                {
+                    data: reportData.bySession.map((s: any) => s.trades),
+                    backgroundColor: reportData.bySession.map((_: any, idx: number) => 
+                        SESSION_COLORS[idx % SESSION_COLORS.length].bg
+                    ),
+                    borderColor: '#0f172a',
+                    borderWidth: 2,
+                    hoverOffset: 6
+                }
+            ]
+        };
+    }, [reportData?.bySession]);
+
+    // Configuração com Linha de Zero Destacada (Losses abaixo de zero)
+    const zeroBaselineChartOptions = useMemo(() => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#090d16',
+                titleColor: '#e2e8f0',
+                bodyColor: '#cbd5e1',
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false,
+                callbacks: {
+                    label: (context: any) => {
+                        const val = Number(context.raw);
+                        const isWin = val >= 0;
+                        return `${isWin ? 'Lucro: +' : 'Loss: -'}$${Math.abs(val).toFixed(2)}`;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                grid: {
+                    display: false
+                },
+                ticks: {
+                    color: '#64748b',
+                    font: { size: 10 },
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 12
+                }
+            },
+            y: {
+                grid: {
+                    color: (context: any) => {
+                        if (context.tick?.value === 0) {
+                            return 'rgba(255, 255, 255, 0.45)'; // Linha do zero destacada
+                        }
+                        return 'rgba(51, 65, 85, 0.2)';
+                    },
+                    lineWidth: (context: any) => {
+                        if (context.tick?.value === 0) return 2;
+                        return 1;
+                    }
+                },
+                ticks: {
+                    color: (context: any) => {
+                        if (context.tick?.value === 0) return '#ffffff';
+                        return '#64748b';
+                    },
+                    font: { size: 10 },
+                    callback: (val: any) => {
+                        const num = Number(val);
+                        if (num === 0) return '$0';
+                        return num > 0 ? `+$${num}` : `-$${Math.abs(num)}`;
+                    }
+                }
+            }
+        }
+    }), []);
+
+    const sessionPieOptions = useMemo(() => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#090d16',
+                titleColor: '#e2e8f0',
+                bodyColor: '#cbd5e1',
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                    label: (context: any) => {
+                        const sess = reportData?.bySession?.[context.dataIndex];
+                        if (!sess) return '';
+                        const totalTrades = reportData.bySession.reduce((acc: number, s: any) => acc + s.trades, 0) || 1;
+                        const pct = ((sess.trades / totalTrades) * 100).toFixed(1);
+                        return ` ${sess.session}: ${sess.trades} ops (${pct}%) • PnL: ${sess.pnl >= 0 ? '+' : ''}$${sess.pnl.toFixed(2)}`;
+                    }
+                }
+            }
+        },
+        cutout: '62%'
+    }), [reportData?.bySession]);
+
+    const kpis = reportData?.kpis;
+    const accountInfo = reportData?.accountInfo;
 
     return (
-        <div className="min-h-[500px] h-[calc(100vh-10rem)] flex flex-col items-center justify-center text-center p-8 bg-slate-950/40 backdrop-blur-xl relative overflow-hidden rounded-3xl border border-slate-900 shadow-2xl">
-            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[80px] -z-10" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[80px] -z-10" />
-            
-            <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6 shadow-xl shadow-emerald-500/5">
-                <Lock size={36} className="animate-pulse" />
+        <div className="space-y-6 max-w-[1600px] mx-auto pb-12 print:p-0">
+            {/* Top Bar / Toolbar */}
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-4 print:hidden">
+                {/* Account Selector Toolbar */}
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-1.5 rounded-xl shadow-xs dark:shadow-lg">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
+                        <span>Conta:</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => selectAccount('all')}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                isConsolidated
+                                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                            }`}
+                        >
+                            Todas
+                        </button>
+                        {accounts.map((acc) => (
+                            <button
+                                key={acc.id}
+                                onClick={() => selectAccount(acc.id)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                    selectedAccountId === acc.id
+                                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                }`}
+                            >
+                                <span>{acc.name}</span>
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase ${
+                                    String(acc.type).toUpperCase() === 'LIVE' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300' : 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
+                                }`}>
+                                    {acc.type}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2.5">
+                    <Button
+                        onClick={handleExportCSV}
+                        variant="secondary"
+                        icon={<Download size={15} />}
+                        className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-semibold text-xs py-2 px-3"
+                        disabled={!reportData?.trades?.length}
+                    >
+                        Exportar CSV
+                    </Button>
+                    <Button
+                        onClick={handlePrint}
+                        variant="gradient"
+                        icon={<Printer size={15} />}
+                        className="font-semibold shadow-md shadow-emerald-500/10 text-xs py-2 px-3"
+                    >
+                        Imprimir / PDF
+                    </Button>
+                </div>
+            </header>
+
+            {/* Filter Bar */}
+            <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xs dark:shadow-none print:hidden">
+                {/* Period Pills */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mr-2 flex items-center gap-1.5">
+                        <Calendar size={13} /> Período:
+                    </span>
+                    {(['today', '7d', '30d', 'this_month', 'all', 'custom'] as const).map((p) => (
+                        <button
+                            key={p}
+                            onClick={() => setPeriod(p)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                period === p
+                                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm shadow-emerald-500/30'
+                                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700/50'
+                            }`}
+                        >
+                            {p === 'today' && 'Hoje'}
+                            {p === '7d' && '7 Dias'}
+                            {p === '30d' && '30 Dias'}
+                            {p === 'this_month' && 'Este Mês'}
+                            {p === 'all' && 'Todo Histórico'}
+                            {p === 'custom' && 'Personalizado'}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Custom Dates & Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                    {period === 'custom' && (
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="bg-transparent text-xs text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none"
+                            />
+                            <span className="text-slate-500 text-xs">até</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="bg-transparent text-xs text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none"
+                            />
+                        </div>
+                    )}
+
+                    {/* Symbol Filter */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Par:</span>
+                        <select
+                            value={symbolFilter}
+                            onChange={(e) => setSymbolFilter(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                            <option value="ALL">Todos os Pares</option>
+                            {availableSymbols.map((sym: string) => (
+                                <option key={sym} value={sym}>{sym}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Type Filter */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ordem:</span>
+                        <select
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                            <option value="ALL">BUY & SELL</option>
+                            <option value="BUY">BUY Apenas</option>
+                            <option value="SELL">SELL Apenas</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">
-                Sistema de Relatórios em Desenvolvimento
-            </h1>
-            <p className="text-slate-400 text-sm max-w-md leading-relaxed mb-8">
-                Estamos preparando relatórios estatísticos extremamente detalhados de performance, drawdown, curva de capital e inteligência de consistência. Em breve estarão disponíveis.
-            </p>
+            {/* Printable Header - Visible in Print or Screen */}
+            <div ref={printRef} className="bg-white dark:bg-[#111319] border border-slate-200 dark:border-white/[0.08] rounded-2xl p-6 relative overflow-hidden shadow-sm dark:shadow-xl text-slate-900 dark:text-[#F3F4F6]">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-white/[0.06] pb-5 mb-6">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                            <Briefcase size={24} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                    {accountInfo?.name || (isConsolidated ? 'Todas as Contas (Consolidado)' : (selectedAccount?.name || 'Conta Trading'))}
+                                </h2>
+                                {accountInfo?.type && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                                        String(accountInfo.type).toUpperCase() === 'LIVE' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                                    }`}>
+                                        {accountInfo.type}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Corretora: <span className="text-slate-700 dark:text-slate-200 font-medium">{accountInfo?.broker || 'N/A'}</span> • Moeda: <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{accountInfo?.currency || 'USD'}</span>
+                            </p>
+                        </div>
+                    </div>
 
-            <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-bold py-2.5 px-6 rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
-            >
-                <ArrowLeft size={16} />
-                Voltar ao Painel
-            </button>
+                    <div className="text-right">
+                        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Período Selecionado</p>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                            {startDate && endDate 
+                                ? `${new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR')} — ${new Date(endDate + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                                : 'Todo o Histórico'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                            Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Primary KPIs 4-Card Grid */}
+                {loading ? (
+                    <div className="py-20 text-center text-slate-400 dark:text-slate-500">Carregando demonstrativo executivo...</div>
+                ) : !kpis || kpis.totalTrades === 0 ? (
+                    <div className="py-16 text-center space-y-3">
+                        <ShieldAlert size={40} className="mx-auto text-slate-400 dark:text-slate-600" />
+                        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">Nenhuma operação encontrada</h3>
+                        <p className="text-slate-500 text-sm max-w-md mx-auto">
+                            Não existem trades fechados para os filtros e conta selecionados. Tente alterar o período ou a conta de trading ativa.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            {/* Net Profit */}
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-none">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Lucro Líquido</span>
+                                    <div className={`p-1.5 rounded-lg ${kpis.netProfit >= 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
+                                        {kpis.netProfit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                                    </div>
+                                </div>
+                                <div className={`text-2xl font-black ${kpis.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                    {kpis.netProfit >= 0 ? '+' : ''}${kpis.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                                    <span>Ganhos: <strong className="text-emerald-600 dark:text-emerald-400">${kpis.grossProfit.toFixed(2)}</strong></span>
+                                    <span>Perdas: <strong className="text-rose-600 dark:text-rose-400">${kpis.grossLoss.toFixed(2)}</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Win Rate */}
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-none">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Taxa de Acerto</span>
+                                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                        <Percent size={16} />
+                                    </div>
+                                </div>
+                                <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                    {kpis.winRate}%
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                                    <span>Total: <strong className="text-slate-700 dark:text-slate-200">{kpis.totalTrades}</strong></span>
+                                    <span>W: <strong className="text-emerald-600 dark:text-emerald-400">{kpis.wins}</strong> / L: <strong className="text-rose-600 dark:text-rose-400">{kpis.losses}</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Profit Factor */}
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-none">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Fator de Lucro</span>
+                                    <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                        <Activity size={16} />
+                                    </div>
+                                </div>
+                                <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                    {kpis.profitFactor}
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                                    <span>R:R Médio: <strong className="text-indigo-600 dark:text-indigo-300">1:{kpis.riskRewardRatio}</strong></span>
+                                    <span>Expectativa: <strong className={kpis.expectancy >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>${kpis.expectancy}</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Max Drawdown */}
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-none">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Drawdown Máximo</span>
+                                    <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                                        <ShieldAlert size={16} />
+                                    </div>
+                                </div>
+                                <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                                    -${kpis.maxDrawdown.toFixed(2)}
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                                    <span>Rebaixamento: <strong className="text-rose-600 dark:text-rose-300">{kpis.maxDrawdownPercent}%</strong></span>
+                                    <span>ROI: <strong className={kpis.roi >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{kpis.roi}%</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Secondary Metrics Ribbon */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 bg-slate-100/70 dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800/60 text-xs">
+                            <div>
+                                <span className="text-slate-500 block">Maior Ganho</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">+${kpis.largestWin.toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 block">Maior Perda</span>
+                                <span className="font-bold text-rose-600 dark:text-rose-400">-${Math.abs(kpis.largestLoss).toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 block">Média de Ganho</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-300">+${kpis.averageWin.toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 block">Média de Perda</span>
+                                <span className="font-bold text-rose-600 dark:text-rose-300">-${Math.abs(kpis.averageLoss).toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 block">Volume Negociado</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{kpis.totalVolume} lotes</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 block">Comissões & Swaps</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">-${(kpis.totalCommission + kpis.totalSwap).toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        {/* Equity Curve & Daily PnL Visual Charts (Losses abaixo do zero) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                            {/* Resultado por Operação / Execuções */}
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between shadow-xs dark:shadow-none">
+                                <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                                            <TrendingUp size={16} className="text-emerald-600 dark:text-emerald-400" />
+                                            {executionChartMode === 'executions' ? 'Resultado por Operação' : 'Curva de Lucro Acumulado'}
+                                        </h3>
+                                        <p className="text-[11px] text-slate-500">
+                                            {executionChartMode === 'executions'
+                                                ? 'Operações com loss destacadas abaixo da linha de zero ($0)'
+                                                : 'Evolução acumulada do capital ao longo das operações'}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setExecutionChartMode('executions')}
+                                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                                                executionChartMode === 'executions'
+                                                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                            }`}
+                                        >
+                                            Por Operação
+                                        </button>
+                                        <button
+                                            onClick={() => setExecutionChartMode('cumulative')}
+                                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                                                executionChartMode === 'cumulative'
+                                                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                            }`}
+                                        >
+                                            Acumulado
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="h-56 w-full relative">
+                                    {executionChartMode === 'cumulative' ? (
+                                        cumulativeLineData ? (
+                                            <Line data={cumulativeLineData} options={zeroBaselineChartOptions as any} />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                                Sem dados suficientes para gerar o gráfico
+                                            </div>
+                                        )
+                                    ) : (
+                                        executionsBarData ? (
+                                            <Bar data={executionsBarData} options={zeroBaselineChartOptions as any} />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                                Sem dados suficientes para gerar o gráfico
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+
+                                <div className="flex justify-between text-[10px] text-slate-500 mt-2 border-t border-slate-200 dark:border-slate-800/60 pt-2 font-mono">
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Lucros (&gt; $0)
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Perdas / Loss (&lt; $0)
+                                    </span>
+                                    <span>{reportData.equityCurve?.length || 0} execuções</span>
+                                </div>
+                            </div>
+
+                            {/* Daily PnL Distribution Bars (Losses abaixo do zero) */}
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between shadow-xs dark:shadow-none">
+                                <div className="flex justify-between items-center mb-3">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                                            <BarChart3 size={16} className="text-indigo-600 dark:text-indigo-400" />
+                                            Distribuição Diária de Resultados
+                                        </h3>
+                                        <p className="text-[11px] text-slate-500">
+                                            Dias negativos destacados abaixo da linha de zero ($0)
+                                        </p>
+                                    </div>
+                                    <span className="text-xs text-slate-500 font-mono">
+                                        {reportData.dailyPnL?.length || 0} dias
+                                    </span>
+                                </div>
+
+                                <div className="h-56 w-full relative">
+                                    {dailyPnLChartData ? (
+                                        <Bar data={dailyPnLChartData} options={zeroBaselineChartOptions as any} />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                            Sem operações registradas no período
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-between text-[10px] text-slate-500 mt-2 border-t border-slate-200 dark:border-slate-800/60 pt-2 font-mono">
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Dias Positivos (&gt; $0)
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Dias Negativos (&lt; $0)
+                                    </span>
+                                    <span>Linha de base = Ponto Zero ($0)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Breakdown Grids: By Symbol, Session, Day of Week */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                            {/* Performance By Symbol */}
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 shadow-xs dark:shadow-none">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                    <PieChart size={16} className="text-blue-500 dark:text-blue-400" />
+                                    Performance por Ativo
+                                </h3>
+                                <div className="space-y-3">
+                                    {reportData.bySymbol && reportData.bySymbol.length > 0 ? (
+                                        reportData.bySymbol.map((s: any) => (
+                                            <div key={s.symbol} className="bg-white dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-xs dark:shadow-none">
+                                                <div>
+                                                    <span className="font-bold text-slate-900 dark:text-slate-200 text-xs">{s.symbol}</span>
+                                                    <span className="text-[10px] text-slate-500 block">{s.trades} trades • {s.winRate}% win</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`text-xs font-bold ${s.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                        {s.pnl >= 0 ? '+' : ''}${s.pnl}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{s.volume} lotes</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-slate-400 dark:text-slate-600 text-xs">Nenhum ativo registrado.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Performance By Session (Com Gráfico de Pizza) */}
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 flex flex-col justify-between shadow-xs dark:shadow-none">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                                        <Clock size={16} className="text-amber-500 dark:text-amber-400" />
+                                        Eficiência por Sessão
+                                    </h3>
+                                    <span className="text-[11px] text-slate-500 font-mono">
+                                        {reportData.bySession?.reduce((sum: number, s: any) => sum + s.trades, 0) || 0} trades
+                                    </span>
+                                </div>
+
+                                {reportData.bySession && reportData.bySession.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {/* Gráfico de Pizza / Doughnut */}
+                                        <div className="h-44 w-full relative flex items-center justify-center">
+                                            <Doughnut data={sessionPieChartData!} options={sessionPieOptions} />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <span className="text-lg font-black text-slate-900 dark:text-slate-100 font-mono">
+                                                    {reportData.bySession.length}
+                                                </span>
+                                                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">
+                                                    Sessões
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Lista Detalhada com Badges e PnL */}
+                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                            {reportData.bySession.map((sess: any, idx: number) => {
+                                                const color = SESSION_COLORS[idx % SESSION_COLORS.length];
+                                                const totalSessionTrades = reportData.bySession.reduce((acc: number, s: any) => acc + s.trades, 0) || 1;
+                                                const pct = ((sess.trades / totalSessionTrades) * 100).toFixed(0);
+
+                                                return (
+                                                    <div key={sess.session} className="bg-white dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex justify-between items-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors shadow-xs dark:shadow-none">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color.bg }} />
+                                                            <div>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-bold text-slate-900 dark:text-slate-200 text-xs uppercase">{sess.session}</span>
+                                                                    <span className="text-[10px] text-slate-500 font-mono">({pct}%)</span>
+                                                                </div>
+                                                                <span className="text-[10px] text-slate-500 block">
+                                                                    {sess.trades} ops • <span className="text-slate-600 dark:text-slate-400 font-semibold">{sess.winRate}% win</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className={`text-xs font-bold font-mono ${sess.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                {sess.pnl >= 0 ? '+' : ''}${sess.pnl.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-44 flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                        Sem dados de sessão registrados no período.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Performance By Day of Week */}
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 shadow-xs dark:shadow-none">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 mb-4 flex items-center gap-2">
+                                    <Layers size={16} className="text-purple-500 dark:text-purple-400" />
+                                    Dias da Semana
+                                </h3>
+                                <div className="space-y-2.5">
+                                    {reportData.byDayOfWeek && reportData.byDayOfWeek.map((d: any) => (
+                                        <div key={d.day} className="flex items-center justify-between text-xs py-1 border-b border-slate-200 dark:border-slate-800/50 last:border-none">
+                                            <span className="text-slate-700 dark:text-slate-300 font-medium">{d.day}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-slate-500 text-[11px]">{d.trades} trades</span>
+                                                <span className={`font-bold w-20 text-right ${d.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                    {d.pnl >= 0 ? '+' : ''}${d.pnl}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Trade Ledger Table */}
+                        <div className="bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800/80 overflow-hidden shadow-xs dark:shadow-none">
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200">Livro de Ordens (Trade Ledger)</h3>
+                                    <p className="text-xs text-slate-500">Listagem de todas as ordens fechadas computadas neste relatório.</p>
+                                </div>
+
+                                <div className="relative w-full md:w-64">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar ticket, par, tipo..."
+                                        value={searchTerm}
+                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs rounded-lg pl-8 pr-3 py-1.5 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead className="bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 uppercase tracking-wider text-[11px]">
+                                        <tr>
+                                            <th className="p-3">Ticket</th>
+                                            {isConsolidated && <th className="p-3">Conta</th>}
+                                            <th className="p-3">Ativo</th>
+                                            <th className="p-3">Tipo</th>
+                                            <th className="p-3">Lote</th>
+                                            <th className="p-3">Abertura</th>
+                                            <th className="p-3">Fechamento</th>
+                                            <th className="p-3 text-right">Resultado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
+                                        {paginatedTrades.map((t: any) => (
+                                            <tr key={t.id} className="hover:bg-slate-100/70 dark:hover:bg-slate-900/40 transition-colors">
+                                                <td className="p-3 font-mono text-slate-700 dark:text-slate-300 font-medium">#{t.ticket}</td>
+                                                {isConsolidated && (
+                                                    <td className="p-3">
+                                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{t.accountName}</span>
+                                                    </td>
+                                                )}
+                                                <td className="p-3 font-bold text-slate-900 dark:text-slate-200">{t.symbol}</td>
+                                                <td className="p-3">
+                                                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                                                        t.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                    }`}>
+                                                        {t.type}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-slate-700 dark:text-slate-300 font-mono">{t.volume}</td>
+                                                <td className="p-3 text-slate-500 dark:text-slate-400">
+                                                    {t.openTime ? new Date(t.openTime).toLocaleDateString('pt-BR') : '-'}
+                                                </td>
+                                                <td className="p-3 text-slate-500 dark:text-slate-400">
+                                                    {t.closeTime ? new Date(t.closeTime).toLocaleDateString('pt-BR') : '-'}
+                                                </td>
+                                                <td className={`p-3 text-right font-bold font-mono ${t.netPnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                    {t.netPnl >= 0 ? '+' : ''}${t.netPnl.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-100/50 dark:bg-slate-900/20">
+                                    <span>Página {currentPage} de {totalPages} ({filteredTrades.length} ordens)</span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="p-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                                        >
+                                            <ChevronLeft size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="p-1 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                                        >
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 };

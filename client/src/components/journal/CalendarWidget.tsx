@@ -29,7 +29,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
     // Empty slots for previous month
     for (let i = 0; i < firstDay; i++) {
-        days.push(<div key={`empty-${i}`} className="aspect-square bg-slate-900/10 border-r border-b border-slate-700/30" />);
+        days.push(<div key={`empty-${i}`} className="aspect-square bg-slate-100/40 dark:bg-slate-900/10 border-r border-b border-slate-200/80 dark:border-slate-700/30" />);
     }
 
     // Days of the month
@@ -45,16 +45,16 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
         const isSelected = selectedDate?.getDate() === day && selectedDate?.getMonth() === currentDate.getMonth() && selectedDate?.getFullYear() === currentDate.getFullYear();
         const isToday = new Date().getDate() === day && new Date().getMonth() === currentDate.getMonth() && new Date().getFullYear() === currentDate.getFullYear();
 
-        let bgClass = "bg-slate-900/20 hover:bg-slate-800/50";
+        let bgClass = "bg-white hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-800/50";
         if (hasTrades) {
             bgClass = pnl >= 0
-                ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20"
-                : "bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/20";
+                ? "bg-emerald-50/70 hover:bg-emerald-100/70 border-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:border-emerald-500/20"
+                : "bg-rose-50/70 hover:bg-rose-100/70 border-rose-200 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:border-rose-500/20";
         }
 
-        let borderClass = "border-r border-b border-slate-700/50";
+        let borderClass = "border-r border-b border-slate-200/80 dark:border-slate-700/50";
         if (isSelected) {
-            bgClass = "bg-indigo-600/20 hover:bg-indigo-600/30 ring-inset ring-2 ring-indigo-500 z-10";
+            bgClass = "bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-600/25 dark:hover:bg-indigo-600/35 ring-inset ring-2 ring-indigo-500 z-10";
             borderClass = "border-transparent";
         }
 
@@ -62,10 +62,16 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
             <div
                 key={day}
                 onClick={() => onDateSelect(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
-                className={`relative p-1.5 aspect-square cursor-pointer transition-all duration-300 flex flex-col justify-between group ${bgClass} ${borderClass}`}
+                className={`relative p-1.5 aspect-square cursor-pointer transition-all duration-200 flex flex-col justify-between group ${bgClass} ${borderClass}`}
             >
                 <div className="flex justify-between items-start">
-                    <span className={`text-sm font-bold ${isSelected || isToday ? 'text-white' : 'text-slate-400'}`}>
+                    <span className={`text-sm font-bold ${
+                        isSelected 
+                            ? 'text-indigo-700 dark:text-white font-black' 
+                            : isToday 
+                                ? 'text-indigo-600 dark:text-indigo-400 font-black' 
+                                : 'text-slate-700 dark:text-slate-300'
+                    }`}>
                         {day}
                     </span>
                     {isToday && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>}
@@ -73,10 +79,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
                 {hasTrades && (
                     <div className="text-right flex flex-col items-end transform group-hover:scale-105 transition-transform">
-                        <div className="text-[9px] text-slate-400 font-bold mb-0.5 leading-none opacity-80 uppercase tracking-tighter">
+                        <div className="text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5 leading-none opacity-80 uppercase tracking-tighter">
                             {dayTrades.length} TX
                         </div>
-                        <div className={`text-[11px] font-black font-mono tracking-tighter ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <div className={`text-[11px] font-black font-mono tracking-tighter ${pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                             {pnl >= 0 ? '+' : '-'}${Math.abs(pnl).toFixed(0)}
                         </div>
                     </div>
@@ -86,23 +92,23 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     }
 
     return (
-        <div className="bg-slate-900/60 backdrop-blur-2xl border-2 border-indigo-500/20 rounded-3xl overflow-hidden shadow-2xl flex flex-col ring-1 ring-white/5">
+        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200 dark:border-indigo-500/20 rounded-3xl overflow-hidden shadow-lg dark:shadow-2xl flex flex-col ring-1 ring-slate-900/5 dark:ring-white/5">
             {/* Calendar Header */}
-            <div className="flex items-center justify-between p-5 bg-gradient-to-b from-indigo-500/10 to-transparent border-b border-slate-800/50">
-                <h3 className="font-bold text-white flex items-center gap-2 text-xl">
+            <div className="flex items-center justify-between p-5 bg-gradient-to-b from-indigo-50/70 to-transparent dark:from-indigo-500/10 dark:to-transparent border-b border-slate-200 dark:border-slate-800/50">
+                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-xl">
                     <span className="capitalize">{currentDate.toLocaleString('pt-BR', { month: 'long' })}</span>
-                    <span className="text-indigo-400 font-mono text-lg">{currentDate.getFullYear()}</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-mono text-lg">{currentDate.getFullYear()}</span>
                 </h3>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => onMonthChange(-1)}
-                        className="p-2 bg-slate-800/50 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-all shadow-sm"
+                        className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm border border-slate-200/80 dark:border-slate-700/50"
                     >
                         <ChevronLeft size={20} />
                     </button>
                     <button
                         onClick={() => onMonthChange(1)}
-                        className="p-2 bg-slate-800/50 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-all shadow-sm"
+                        className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm border border-slate-200/80 dark:border-slate-700/50"
                     >
                         <ChevronRight size={20} />
                     </button>
@@ -110,16 +116,16 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
             </div>
 
             {/* Days Header */}
-            <div className="grid grid-cols-7 bg-slate-900 py-3 text-center border-b border-slate-800/50 shadow-inner">
+            <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-900 py-3 text-center border-b border-slate-200 dark:border-slate-800/50">
                 {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
-                    <span key={i} className={`text-xs font-bold tracking-wider ${i === 0 || i === 6 ? 'text-rose-400' : 'text-slate-400'}`}>
+                    <span key={i} className={`text-xs font-bold tracking-wider ${i === 0 || i === 6 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}>
                         {d}
                     </span>
                 ))}
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 flex-1 content-start bg-slate-950/20">
+            <div className="grid grid-cols-7 flex-1 content-start bg-slate-50/50 dark:bg-slate-950/20">
                 {days}
             </div>
         </div>

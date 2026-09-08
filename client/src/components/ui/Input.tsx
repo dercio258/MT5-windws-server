@@ -9,7 +9,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, error, icon, variant = 'dark', className = '', ...props }, ref) => {
     const variants = {
-        dark: 'bg-slate-900/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/50',
+        dark: 'bg-[#08090C] border-white/[0.08] text-slate-100 placeholder:text-slate-500 focus:border-[#10B981] focus:ring-[#10B981]/20',
         light: 'bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:ring-emerald-500/20'
     };
 
@@ -27,7 +27,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, error, i
                 <input
                     ref={ref}
                     className={`
-                        w-full border rounded-lg py-2.5 
+                        w-full border rounded-xl py-2.5 
                         focus:outline-none focus:ring-1 transition-all
                         ${icon ? 'pl-10' : 'px-4'}
                         ${variants[variant]}

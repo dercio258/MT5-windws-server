@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { BrainCircuit, Save, Zap, Moon, Target, Smile, AlertTriangle, Coffee, History, ExternalLink, Calendar, Share2 } from 'lucide-react';
+import { BrainCircuit, Save, Zap, Moon, Target, Smile, AlertTriangle, Coffee, History, ExternalLink, Calendar, Share2, Briefcase } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAccount } from '../context/AccountContext';
 import { Button } from '../components/ui/Button';
 import api from '../api';
 import html2canvas from 'html2canvas';
@@ -22,6 +23,14 @@ interface MentalLog {
     imageUrl?: string;
     session?: string;
     time?: string;
+    accountId?: string;
+    account?: {
+        id: string;
+        name: string;
+        broker: string;
+        type: string;
+        currency: string;
+    };
 }
 
 const getSession = () => {
@@ -50,13 +59,13 @@ const MetricSlider = ({
     reverse?: boolean
 }) => {
     return (
-        <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 hover:border-slate-700/50 transition-colors">
+        <div className="bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700/50 transition-colors shadow-xs">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <Icon size={18} className={colorClass} />
-                    <span className="text-sm font-medium text-slate-300">{label}</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-300">{label}</span>
                 </div>
-                <span className="text-lg font-bold text-slate-100">{value}</span>
+                <span className="text-lg font-black font-mono text-slate-900 dark:text-slate-100">{value}</span>
             </div>
             <input
                 type="range"
@@ -64,9 +73,9 @@ const MetricSlider = ({
                 max="10"
                 value={value}
                 onChange={(e) => onChange(parseInt(e.target.value))}
-                className={`w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer ${bgClass}`}
+                className={`w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer ${bgClass}`}
             />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-2 uppercase tracking-wider font-medium">
+            <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-2 uppercase tracking-wider font-semibold">
                 <span>{reverse ? 'Alto' : 'Baixo'}</span>
                 <span>{reverse ? 'Baixo' : 'Alto'}</span>
             </div>
@@ -95,7 +104,7 @@ const MentalScore = ({ score }: { score: number }) => {
                     stroke="currentColor"
                     strokeWidth="12"
                     fill="transparent"
-                    className="text-slate-800"
+                    className="text-slate-200 dark:text-slate-800"
                 />
                 <circle
                     cx="96"
@@ -120,7 +129,7 @@ const MentalScore = ({ score }: { score: number }) => {
 
 const EmotionalManagement = () => {
     const { token, userEmail } = useAuth();
-    // const navigate = useNavigate(); // Unused
+    const { selectedAccountId, selectedAccount, accounts, isConsolidated, selectAccount } = useAccount();
     const captureRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -128,8 +137,7 @@ const EmotionalManagement = () => {
     const [userName, setUserName] = useState<string>('');
     const currentSession = getSession();
 
-    // Default State
-    const [log, setLog] = useState<MentalLog>({
+    const getDefaultLog = (): MentalLog => ({
         date: new Date().toISOString().split('T')[0],
         sleepQuality: 5,
         energy: 5,
@@ -139,13 +147,22 @@ const EmotionalManagement = () => {
         caffeine: 1,
         notes: '',
         overallScore: 50,
-        session: getSession(),
-        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        session: currentSession,
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        accountId: selectedAccountId !== 'all' ? selectedAccountId : selectedAccount?.id
     });
+
+    // Default State
+    const [log, setLog] = useState<MentalLog>(getDefaultLog());
 
     useEffect(() => {
         if (token) {
             fetchLog();
+        }
+    }, [token, selectedAccountId]);
+
+    useEffect(() => {
+        if (token) {
             fetchUserProfile();
         }
     }, [token]);
@@ -164,13 +181,23 @@ const EmotionalManagement = () => {
     const fetchLog = async () => {
         try {
             setLoading(true);
-            const res = await api.get('/dashboard/mental-log/today', {
-                params: { session: currentSession }
-            });
-            if (res.data) setLog(res.data);
+            const params: any = { session: currentSession };
+            if (selectedAccountId && selectedAccountId !== 'all') {
+                params.accountId = selectedAccountId;
+            }
+            const res = await api.get('/dashboard/mental-log/today', { params });
+            if (res.data) {
+                setLog(res.data);
+            } else {
+                setLog(getDefaultLog());
+            }
 
             // Fetch History
-            const historyRes = await api.get('/dashboard/mental-log/history');
+            const historyParams: any = {};
+            if (selectedAccountId && selectedAccountId !== 'all') {
+                historyParams.accountId = selectedAccountId;
+            }
+            const historyRes = await api.get('/dashboard/mental-log/history', { params: historyParams });
             if (historyRes.data) {
                 setHistory(historyRes.data);
             }
@@ -182,17 +209,21 @@ const EmotionalManagement = () => {
         }
     };
 
-
-
     const handleSave = async () => {
         try {
             setSaving(true);
- 
+            const targetAccountId = selectedAccountId && selectedAccountId !== 'all'
+                ? selectedAccountId
+                : (selectedAccount?.id || accounts.find(a => a.isPrimary)?.id || accounts[0]?.id);
+
             // 1. Save Text Data
             const res = await api.post('/dashboard/mental-log', {
                 ...log,
+                accountId: targetAccountId,
                 session: currentSession,
                 time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            }, {
+                params: targetAccountId ? { accountId: targetAccountId } : undefined
             });
 
             if (res.data) {
@@ -213,8 +244,12 @@ const EmotionalManagement = () => {
                             const formData = new FormData();
                             formData.append('file', blob, `log-${Date.now()}.png`);
                             formData.append('session', currentSession);
- 
+                            if (targetAccountId) {
+                                formData.append('accountId', targetAccountId);
+                            }
+
                             await api.post('/dashboard/mental-log/image', formData, {
+                                params: targetAccountId ? { accountId: targetAccountId } : undefined,
                                 headers: {
                                     'Content-Type': 'multipart/form-data'
                                 }
@@ -292,28 +327,66 @@ const EmotionalManagement = () => {
 
     return (
         <div className="space-y-6">
-            <header className="flex justify-between items-center">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-                        <BrainCircuit className="text-purple-400" />
-                        Gestão Mental
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <BrainCircuit className="text-purple-500 dark:text-purple-400" />
+                        Gestão Mental & Emocional
                     </h1>
-                    <p className="text-slate-400">Prepare sua mente antes de cada sessão.</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Prepare sua mente antes de cada sessão de trading.</p>
                 </div>
-                <div className="text-right hidden md:block">
-                    <p className="text-sm text-slate-500">Hoje</p>
-                    <p className="text-xl font-bold text-slate-200">
-                        {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </p>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Account Selector / Indicator */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-1.5 rounded-xl shadow-xs">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <Briefcase size={14} className="text-indigo-500 dark:text-indigo-400" />
+                            <span>Conta:</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => selectAccount('all')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                    isConsolidated
+                                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                }`}
+                            >
+                                Todas
+                            </button>
+                            {accounts.map((acc) => (
+                                <button
+                                    key={acc.id}
+                                    onClick={() => selectAccount(acc.id)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                        selectedAccountId === acc.id
+                                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                                    }`}
+                                >
+                                    <span>{acc.name}</span>
+                                    <span className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase ${
+                                        String(acc.type).toUpperCase() === 'LIVE' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300' : 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
+                                    }`}>
+                                        {acc.type}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="text-right hidden xl:block pl-2 border-l border-slate-200 dark:border-slate-800">
+                        <p className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Hoje</p>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                            {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </p>
+                    </div>
                 </div>
             </header>
 
             <div ref={captureRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-                {/* Print Header - Visible only in screenshot or usually hidden but we can make it part of the card design or just hidden and show on print. 
-                     The user asked for "Data do registo, Nome do usuario" in the print. 
-                     Since html2canvas captures what is visible, we should add a header block inside this div. 
-                 */}
-                <div className="lg:col-span-3 bg-slate-800/80 p-4 rounded-xl border border-slate-700/50 flex justify-between items-center mb-0">
+                {/* Print Header - Captures branding, user, and active trading account */}
+                <div className="lg:col-span-3 bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 flex flex-wrap justify-between items-center gap-4 mb-0 shadow-xs">
                     <div className="flex items-center gap-4">
                         <img
                             src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
@@ -322,33 +395,44 @@ const EmotionalManagement = () => {
                             crossOrigin="anonymous"
                         />
                         <div>
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 TOREX JOURNAL
                             </h2>
-                            <p className="text-slate-400 text-sm">Relatório Mental Diário</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm">Relatório Mental Diário</p>
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-emerald-400 font-bold text-lg">{userName || userEmail}</p>
-                        <p className="text-slate-500 text-sm">
+                        <div className="flex items-center justify-end gap-2">
+                            <p className="text-emerald-600 dark:text-emerald-400 font-bold text-lg">{userName || userEmail}</p>
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1">
+                                <Briefcase size={12} className="text-indigo-500 dark:text-indigo-400" />
+                                {isConsolidated ? 'Todas as Contas' : (selectedAccount?.name || 'Conta Padrão')}
+                            </span>
+                        </div>
+                        {selectedAccount && !isConsolidated && (
+                            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+                                {selectedAccount.broker} • <span className={String(selectedAccount.type).toUpperCase() === 'LIVE' ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-blue-600 dark:text-blue-400 font-semibold'}>{selectedAccount.type}</span> ({selectedAccount.currency})
+                            </p>
+                        )}
+                        <p className="text-slate-500 text-xs mt-0.5">
                             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                         </p>
-                        <p className="text-slate-400 text-xs mt-1 font-mono">
-                            {log.time || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {log.session || currentSession}
+                        <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-mono">
+                            {log.time || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Sessão {log.session || currentSession}
                         </p>
                     </div>
                 </div>
 
                 {/* Score Column */}
-                <div className="lg:col-span-1 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-6">
-                    <h3 className="text-lg font-semibold text-slate-300">Score Diário</h3>
+                <div className="lg:col-span-1 bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-6 shadow-sm dark:shadow-none">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200">Score Diário</h3>
                     <MentalScore score={log.overallScore} />
 
-                    <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50 w-full">
-                        <div className="flex items-center gap-2 mb-2 text-slate-300 font-medium">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700/50 w-full text-left">
+                        <div className="flex items-center gap-2 mb-2 text-slate-800 dark:text-slate-300 font-semibold">
                             <Target size={16} /> Insight do Sistema
                         </div>
-                        <p className={`text-sm ${log.overallScore < 50 ? 'text-red-400' : 'text-slate-400'}`}>
+                        <p className={`text-sm ${log.overallScore < 50 ? 'text-red-500 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
                             {getInsight(log.overallScore)}
                         </p>
                     </div>
@@ -366,15 +450,15 @@ const EmotionalManagement = () => {
 
                 {/* Metrics Grid */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                        <h3 className="text-lg font-semibold text-slate-300 mb-6">Métricas Fisiológicas</h3>
+                    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-none">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 mb-6">Métricas Fisiológicas</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <MetricSlider
                                 label="Qualidade do Sono"
                                 value={log.sleepQuality}
                                 onChange={(v) => updateMetric('sleepQuality', v)}
                                 icon={Moon}
-                                colorClass="text-indigo-400"
+                                colorClass="text-indigo-500 dark:text-indigo-400"
                                 bgClass="accent-indigo-500"
                             />
                             <MetricSlider
@@ -382,7 +466,7 @@ const EmotionalManagement = () => {
                                 value={log.energy}
                                 onChange={(v) => updateMetric('energy', v)}
                                 icon={Zap}
-                                colorClass="text-yellow-400"
+                                colorClass="text-yellow-500 dark:text-yellow-400"
                                 bgClass="accent-yellow-500"
                             />
                             <MetricSlider
@@ -390,7 +474,7 @@ const EmotionalManagement = () => {
                                 value={log.focus}
                                 onChange={(v) => updateMetric('focus', v)}
                                 icon={Target}
-                                colorClass="text-blue-400"
+                                colorClass="text-blue-500 dark:text-blue-400"
                                 bgClass="accent-blue-500"
                             />
                             <MetricSlider
@@ -404,15 +488,15 @@ const EmotionalManagement = () => {
                         </div>
                     </div>
 
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                        <h3 className="text-lg font-semibold text-slate-300 mb-6">Estado Emocional</h3>
+                    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-none">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 mb-6">Estado Emocional</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <MetricSlider
                                 label="Humor Geral"
                                 value={log.mood}
                                 onChange={(v) => updateMetric('mood', v)}
                                 icon={Smile}
-                                colorClass="text-emerald-400"
+                                colorClass="text-emerald-500 dark:text-emerald-400"
                                 bgClass="accent-emerald-500"
                             />
                             <MetricSlider
@@ -420,19 +504,19 @@ const EmotionalManagement = () => {
                                 value={log.stress}
                                 onChange={(v) => updateMetric('stress', v)}
                                 icon={AlertTriangle}
-                                colorClass="text-red-400"
+                                colorClass="text-red-500 dark:text-red-400"
                                 bgClass="accent-red-500"
                                 reverse={true} // High stress is bad
                             />
                         </div>
                     </div>
 
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                        <h3 className="text-lg font-semibold text-slate-300 mb-4">Notas & Observações</h3>
+                    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-none">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 mb-4">Notas & Observações</h3>
                         <textarea
                             value={log.notes}
                             onChange={(e) => updateMetric('notes', e.target.value)}
-                            className="w-full h-24 bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all placeholder:text-slate-600"
+                            className="w-full h-24 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none transition-all"
                             placeholder="Algum evento externo afetando seu trading hoje? Notícias, família, saúde..."
                         ></textarea>
                     </div>
@@ -440,56 +524,72 @@ const EmotionalManagement = () => {
             </div>
 
             {/* History Section */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mt-6">
+            <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mt-6 shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-2 mb-6">
-                    <History className="text-slate-400" />
-                    <h3 className="text-lg font-semibold text-slate-300">Histórico de Registros</h3>
+                    <History className="text-slate-500 dark:text-slate-400" />
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200">Histórico de Registros</h3>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-950/30 text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="bg-slate-100/90 dark:bg-slate-950/30 text-xs text-slate-700 dark:text-slate-400 uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-800">
                             <tr>
                                 <th className="p-4 rounded-tl-lg">Data & Hora</th>
+                                <th className="p-4">Conta Trading</th>
                                 <th className="p-4">Sessão</th>
                                 <th className="p-4">Score</th>
                                 <th className="p-4">Insight do Sistema</th>
                                 <th className="p-4 rounded-tr-lg text-right">Ação</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/50 text-sm">
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50 text-sm">
                             {history.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="p-8 text-center text-slate-500 italic">
+                                    <td colSpan={6} className="p-8 text-center text-slate-500 italic">
                                         Nenhum registro encontrado no histórico.
                                     </td>
                                 </tr>
                             ) : history.map((h) => (
-                                <tr key={h.id} className="hover:bg-slate-800/30 transition-colors group">
-                                    <td className="p-4 text-slate-300 font-medium whitespace-nowrap">
+                                <tr key={h.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+                                    <td className="p-4 text-slate-800 dark:text-slate-300 font-medium whitespace-nowrap">
                                         <div className="flex items-center gap-2">
-                                            <Calendar size={14} className="text-slate-500" />
+                                            <Calendar size={14} className="text-slate-400 dark:text-slate-500" />
                                             <div className="flex flex-col">
                                                 <span>{new Date(h.date).toLocaleDateString('pt-BR')}</span>
-                                                <span className="text-xs text-slate-500">{h.time || new Date(h.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400">{h.time || new Date(h.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     </td>
+                                    <td className="p-4 whitespace-nowrap">
+                                        {h.account ? (
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-slate-900 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                                                    <Briefcase size={12} className="text-indigo-500 dark:text-indigo-400" />
+                                                    {h.account.name}
+                                                </span>
+                                                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                                    {h.account.broker} • <span className={String(h.account.type).toUpperCase() === 'LIVE' ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-blue-600 dark:text-blue-400 font-medium'}>{h.account.type}</span>
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-500 text-xs italic">Conta Padrão</span>
+                                        )}
+                                    </td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${h.session === 'London' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                            h.session === 'New York' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                h.session === 'Asian' ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' :
-                                                    'bg-slate-800 text-slate-400 border border-slate-700'
+                                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${h.session === 'London' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20' :
+                                            h.session === 'New York' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
+                                                h.session === 'Asian' ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20' :
+                                                    'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                                             }`}>
                                             {h.session || 'N/A'}
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold border ${h.overallScore >= 75 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : h.overallScore >= 50 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold border ${h.overallScore >= 75 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : h.overallScore >= 50 ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'}`}>
                                             {h.overallScore}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-slate-400">
+                                    <td className="p-4 text-slate-700 dark:text-slate-400">
                                         {getInsight(h.overallScore)}
                                     </td>
                                     <td className="p-4 text-right">
@@ -500,14 +600,14 @@ const EmotionalManagement = () => {
                                                         href={`${window.location.origin}${h.imageUrl}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-emerald-400 hover:text-emerald-300 transition-colors text-xs font-bold uppercase tracking-wider border border-slate-700"
+                                                        className="inline-flex items-center gap-2 p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-emerald-600 dark:text-emerald-400 transition-colors text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700"
                                                         title="Ver Imagem Original"
                                                     >
                                                         <ExternalLink size={16} /> Ver
                                                     </a>
                                                     <button
                                                         onClick={() => handleShare(h.imageUrl)}
-                                                        className="inline-flex items-center gap-2 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-blue-400 hover:text-blue-300 transition-colors text-xs font-bold uppercase tracking-wider border border-slate-700"
+                                                        className="inline-flex items-center gap-2 p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-blue-600 dark:text-blue-400 transition-colors text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 cursor-pointer"
                                                         title="Compartilhar"
                                                     >
                                                         <Share2 size={16} /> Share
@@ -515,7 +615,7 @@ const EmotionalManagement = () => {
                                                 </>
 
                                             ) : (
-                                                <span className="text-slate-600 text-xs italic">Sem Imagem</span>
+                                                <span className="text-slate-400 dark:text-slate-600 text-xs italic">Sem Imagem</span>
                                             )}
                                         </div>
                                     </td>

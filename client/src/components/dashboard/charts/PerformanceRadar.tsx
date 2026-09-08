@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { Radar } from 'lucide-react';
 
@@ -16,7 +15,7 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
     // Configuration
     const size = 300;
     const center = size / 2;
-    const radius = 100; // max radius
+    const radius = 80; // reduced from 100 to leave ample room for labels without clipping
     const levels = 5; // 20, 40, 60, 80, 100
 
     const axes = [
@@ -51,19 +50,21 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
             }).join(' ');
             return { points };
         });
-    }, []);
+    }, [radius]);
 
-    // Construct Axis Lines
+    // Construct Axis Lines & Refined Label Positions
     const axisLines = useMemo(() => {
-        return axes.map((_, i) => {
+        return axes.map((axis, i) => {
+            const val = data ? (data as any)[axis.key] || 0 : 0;
             return {
                 x1: center, y1: center,
                 x2: getPoint(100, i).x, y2: getPoint(100, i).y,
-                labelPos: getPoint(100, i, 1.35),
-                label: axes[i].label
+                labelPos: getPoint(100, i, 1.25),
+                label: axis.label,
+                val: Math.round(Number(val) || 0)
             };
         });
-    }, []);
+    }, [data, radius]);
 
     // Construct Data Polygon
     const dataPoints = axes.map((axis, i) => {
@@ -73,31 +74,46 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
 
     const dataPath = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
 
+    // Calculate dynamic general score
+    const avgScore = useMemo(() => {
+        if (!data) return 0;
+        const vals = [
+            Number(data.consistency) || 0,
+            Number(data.riskManagement) || 0,
+            Number(data.discipline) || 0,
+            Number(data.profitability) || 0,
+            Number(data.winRate) || 0,
+        ];
+        return Math.round(vals.reduce((a, b) => a + b, 0) / 5);
+    }, [data]);
+
     return (
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 relative overflow-hidden flex flex-col h-full shadow-lg hover:border-slate-700 transition-colors duration-500">
+        <div className="bg-transparent w-full relative overflow-hidden flex flex-col h-full">
             {/* Header */}
-            <div className="flex justify-between items-center mb-2 z-10">
-                <h3 className="font-bold text-slate-100 flex items-center gap-2 text-sm uppercase tracking-wider">
-                    <Radar className="text-emerald-400" size={18} /> Performance Radar
-                </h3>
+            <div className="flex justify-between items-center mb-1 z-10">
+                <span className="text-xs sm:text-[13px] font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Radar className="text-emerald-400" size={15} /> Performance Radar
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                    Score: <strong className="text-emerald-400 font-bold">{avgScore}/100</strong>
+                </span>
             </div>
 
             {/* Ambient Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/10 rounded-full blur-[50px] pointer-events-none" />
 
             {/* SVG Chart */}
-            <div className="flex-1 flex items-center justify-center relative z-10 min-h-[300px]">
-                <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-[350px]">
+            <div className="flex-1 flex items-center justify-center relative z-10 min-h-[260px] sm:min-h-[280px]">
+                <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-[320px]">
                     {/* Grid Levels */}
                     {gridPolygons.map(({ points }, i) => (
                         <polygon
                             key={`grid-${i}`}
                             points={points}
                             fill="none"
-                            stroke="#334155" // slate-700
+                            stroke="rgba(148, 163, 184, 0.14)"
                             strokeWidth="1"
-                            strokeDasharray="4 4"
-                            className="opacity-30"
+                            strokeDasharray="3 3"
                         />
                     ))}
 
@@ -107,25 +123,23 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
                             <line
                                 x1={line.x1} y1={line.y1}
                                 x2={line.x2} y2={line.y2}
-                                stroke="#334155"
+                                stroke="rgba(148, 163, 184, 0.14)"
                                 strokeWidth="1"
-                                className="opacity-30"
                             />
-                            {/* Labels */}
+                            {/* Refined compact labels */}
                             <text
                                 x={line.labelPos.x}
                                 y={line.labelPos.y}
-                                fill="#94a3b8" // slate-400
-                                fontSize="10"
+                                fill="#94a3b8"
+                                fontSize="8.5"
                                 fontWeight="600"
                                 textAnchor="middle"
                                 dominantBaseline="middle"
-                                className="uppercase tracking-widest"
+                                letterSpacing="0.03em"
+                                className="font-sans select-none"
                             >
                                 {line.label}
                             </text>
-
-                            {/* Axis Value Indicators (0, 50, 100) - Optional */}
                         </g>
                     ))}
 
@@ -134,8 +148,8 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
                         {/* Fill Gradient Def */}
                         <defs>
                             <radialGradient id="radarGradient" cx="0.5" cy="0.5" r="0.5">
-                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.1" />
+                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
+                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.12" />
                             </radialGradient>
                             <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                                 <feGaussianBlur stdDeviation="2" result="coloredBlur" />
@@ -152,7 +166,7 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
                             stroke="#10b981"
                             strokeWidth="2"
                             filter="url(#glow)"
-                            className="drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                            className="drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]"
                         />
 
                         {/* Data Points (Dots) */}
@@ -162,9 +176,9 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
                                 cx={p.x}
                                 cy={p.y}
                                 r="3"
-                                fill="#0f172a" // slate-900 background
+                                fill="#111319"
                                 stroke="#10b981"
-                                strokeWidth="2"
+                                strokeWidth="1.5"
                                 className="hover:r-4 transition-all"
                             />
                         ))}
@@ -172,8 +186,8 @@ export const PerformanceRadar = ({ data }: RadarProps) => {
                 </svg>
             </div>
 
-            <div className="text-xs text-center text-slate-500 mt-2">
-                Score Geral: <span className="text-emerald-400 font-bold">88/100</span>
+            <div className="text-[11px] text-center text-slate-400 mt-1 font-mono">
+                Consistência Geral: <span className="text-emerald-400 font-bold">{avgScore}%</span>
             </div>
         </div>
     );

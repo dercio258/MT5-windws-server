@@ -42,20 +42,20 @@ export const AutoSyncForm = ({ brokerName, serverName = '', onBack }: AutoSyncFo
         <div className="max-w-xl mx-auto animate-in fade-in slide-in-from-right-4">
             <button
                 onClick={onBack}
-                className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors mb-6 text-sm"
+                className="flex items-center gap-2 text-[#9CA3AF] hover:text-[#F3F4F6] transition-colors mb-6 text-sm"
             >
                 <ArrowLeft size={16} />
                 Back to Brokers
             </button>
 
-            <Card className="p-8 bg-slate-900 border-slate-800">
+            <Card className="p-8 bg-[#111319] border-white/[0.08] shadow-2xl">
                 <div className="flex items-center gap-4 mb-8">
                     <div className="w-12 h-12 bg-yellow-400/10 rounded-full flex items-center justify-center text-yellow-400">
                         <Cloud size={24} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-100">Connect {brokerName}</h2>
-                        <p className="text-sm text-slate-400">Enter your trading credentials to auto-sync.</p>
+                        <h2 className="text-xl font-bold text-[#F3F4F6]">Connect {brokerName}</h2>
+                        <p className="text-sm text-[#9CA3AF]">Enter your trading credentials to auto-sync.</p>
                     </div>
                 </div>
 
@@ -65,7 +65,7 @@ export const AutoSyncForm = ({ brokerName, serverName = '', onBack }: AutoSyncFo
                         placeholder="Enter your MetaTrader Login ID"
                         value={login}
                         onChange={(e) => setLogin(e.target.value)}
-                        className="bg-slate-950 border-slate-800"
+                        className="bg-[#08090C] border-white/[0.08]"
                     />
 
                     <Input
@@ -74,9 +74,9 @@ export const AutoSyncForm = ({ brokerName, serverName = '', onBack }: AutoSyncFo
                         placeholder="Enter Investor Password (or regular)"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="bg-slate-950 border-slate-800"
+                        className="bg-[#08090C] border-white/[0.08]"
                     />
-                    <p className="text-xs text-slate-500 -mt-4">
+                    <p className="text-xs text-[#6B7280] -mt-4">
                         * Investor password allows read-only access (safer).
                     </p>
 
@@ -85,7 +85,7 @@ export const AutoSyncForm = ({ brokerName, serverName = '', onBack }: AutoSyncFo
                         placeholder="Search for your server (e.g. Exness-Real2)"
                         value={server}
                         onChange={(e) => setServer(e.target.value)}
-                        className="bg-slate-950 border-slate-800"
+                        className="bg-[#08090C] border-white/[0.08]"
                     />
 
                     {status && (

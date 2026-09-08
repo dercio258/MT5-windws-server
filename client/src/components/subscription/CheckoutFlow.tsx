@@ -4,7 +4,17 @@ import { motion } from 'framer-motion';
 
 // --- Sub-components ---
 
-export const PlanSummary = ({ plan, billingCycle, total }: { plan: any; billingCycle: string; total: number }) => {
+export const PlanSummary = ({ 
+    plan, 
+    billingCycle, 
+    total,
+    exchangeRate = 65
+}: { 
+    plan: any; 
+    billingCycle: string; 
+    total: number;
+    exchangeRate?: number;
+}) => {
     const isYearly = billingCycle === 'YEARLY';
     const subtotal = plan.monthlyPrice * (isYearly ? 12 : 1);
     const discount = isYearly ? subtotal * (plan.annualDiscountPercent / 100) : 0;
@@ -16,10 +26,10 @@ export const PlanSummary = ({ plan, billingCycle, total }: { plan: any; billingC
             transition={{ duration: 0.5 }}
             className="space-y-6"
         >
-            <div className="flex flex-col pb-6 border-b border-slate-800/80">
-                <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-1 block">Plano Selecionado</span>
+            <div className="flex flex-col pb-6 border-b border-slate-200 dark:border-slate-800/80">
+                <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider mb-1 block">Plano Selecionado</span>
                 <div className="flex justify-between items-baseline">
-                    <h3 className="text-3xl font-black text-white tracking-tight">{plan.tier}</h3>
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{plan.tier}</h3>
                     <div className="text-right">
                         <span className="text-[10px] text-slate-500 uppercase tracking-widest block font-bold">Cobrança {isYearly ? 'Anual' : 'Mensal'}</span>
                     </div>
@@ -28,27 +38,29 @@ export const PlanSummary = ({ plan, billingCycle, total }: { plan: any; billingC
 
             {/* Price Breakdown */}
             <div className="space-y-3 py-2 text-sm">
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Preço Base</span>
-                    <span className="font-mono text-slate-300">MT {subtotal.toFixed(2)}</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-300 font-semibold">$ {subtotal.toFixed(2)} USD</span>
                 </div>
                 {isYearly && (
-                    <div className="flex justify-between text-emerald-400 font-semibold bg-emerald-500/5 p-2.5 rounded-xl border border-emerald-500/10">
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
                         <span>Desconto Anual (-{plan.annualDiscountPercent}%)</span>
-                        <span className="font-mono">- MT {discount.toFixed(2)}</span>
+                        <span className="font-mono">- $ {discount.toFixed(2)} USD</span>
                     </div>
                 )}
-                <div className="flex justify-between items-baseline pt-3 border-t border-slate-800/50 text-white">
+                <div className="flex justify-between items-baseline pt-3 border-t border-slate-200 dark:border-slate-800/50 text-slate-900 dark:text-white">
                     <span className="font-bold">Total a Pagar</span>
                     <div className="text-right">
-                        <span className="text-2xl font-black font-mono text-white">MT {total.toFixed(2)}</span>
-                        <span className="text-[10px] text-slate-500 block uppercase tracking-tighter mt-0.5">IVA Incluso</span>
+                        <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">$ {total.toFixed(2)} USD</span>
+                        <span className="text-[10px] text-slate-500 block uppercase tracking-tighter mt-0.5 font-mono">
+                            ~ MT {(total * exchangeRate).toFixed(0)} MZN (M-Pesa / e-Mola)
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-md">
-                <h4 className="text-xs font-black text-white/90 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/60 rounded-3xl p-6 backdrop-blur-md shadow-sm">
+                <h4 className="text-xs font-black text-slate-900 dark:text-white/90 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                     Benefícios Inclusos
                 </h4>
@@ -59,7 +71,7 @@ export const PlanSummary = ({ plan, billingCycle, total }: { plan: any; billingC
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
                             key={i} 
-                            className="flex items-start gap-3 text-sm text-slate-300"
+                            className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300"
                         >
                             <Check size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
                             <span>{feat}</span>
@@ -68,8 +80,8 @@ export const PlanSummary = ({ plan, billingCycle, total }: { plan: any; billingC
                 </ul>
             </div>
             
-            <div className="flex items-center gap-3 p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl text-xs text-indigo-300/80">
-                <ShieldCheck size={18} className="flex-shrink-0 text-indigo-400" />
+            <div className="flex items-center gap-3 p-4 bg-indigo-500/5 border border-indigo-500/15 rounded-2xl text-xs text-indigo-700 dark:text-indigo-300/80">
+                <ShieldCheck size={18} className="flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <p>Sua transação é protegida por criptografia de ponta a ponta via Debito.co.mz</p>
             </div>
         </motion.div>
@@ -100,21 +112,21 @@ export const PaymentMethodBadge = ({
             onClick={onClick}
             className={`relative group p-4 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center gap-2.5 overflow-hidden ${
                 active 
-                ? 'border-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(99,102,241,0.05)] text-white' 
-                : 'border-slate-800 bg-slate-900/20 text-slate-400 hover:border-slate-700 hover:bg-slate-900/40 hover:text-white'
+                ? 'border-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/5 shadow-[0_0_20px_rgba(99,102,241,0.1)] text-indigo-900 dark:text-white' 
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/20 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/40 hover:text-slate-900 dark:hover:text-white'
             }`}
         >
             <div className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-300 ${
-                active ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-900/80 border border-slate-800 text-slate-400'
+                active ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
             }`}>
                 {img ? <img src={img} alt={label} className="w-full h-full object-cover rounded-xl" /> : <Icon size={22} />}
             </div>
             
             <div className="text-center">
-                <span className={`text-[10px] font-black uppercase tracking-widest block ${active ? 'text-indigo-400' : 'text-slate-500'}`}>
+                <span className={`text-[10px] font-black uppercase tracking-widest block ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-500'}`}>
                     {label}
                 </span>
-                <span className="text-[8px] font-bold text-slate-500 px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded mt-1 inline-block">
+                <span className="text-[8px] font-bold text-slate-500 px-1.5 py-0.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded mt-1 inline-block">
                     {isZar ? 'ZAR' : 'MZN'}
                 </span>
             </div>
@@ -162,10 +174,10 @@ export const MobileMoneyForm = ({
                     <span className="text-[9px] text-slate-600 font-bold uppercase">Moçambique</span>
                 </div>
                 
-                <div className={`group flex items-center bg-slate-950 border rounded-2xl overflow-hidden transition-all duration-300 focus-within:ring-4 focus-within:ring-indigo-500/10 ${
-                    isInvalid ? 'border-rose-500/50' : 'border-slate-800 focus-within:border-indigo-500/70'
+                <div className={`group flex items-center bg-slate-50 dark:bg-slate-950 border rounded-2xl overflow-hidden transition-all duration-300 focus-within:ring-4 focus-within:ring-indigo-500/10 ${
+                    isInvalid ? 'border-rose-500/50' : 'border-slate-200 dark:border-slate-800 focus-within:border-indigo-500/70'
                 }`}>
-                    <div className="px-5 py-3.5 bg-slate-900 border-r border-slate-800 text-slate-500 font-bold text-sm select-none">
+                    <div className="px-5 py-3.5 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 font-bold text-sm select-none">
                         +258
                     </div>
                     <input
@@ -173,14 +185,14 @@ export const MobileMoneyForm = ({
                         value={phoneNumber}
                         onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                         placeholder={method === 'mpesa' ? '84 / 85' : '86 / 87'}
-                        className="flex-1 bg-transparent px-5 py-3.5 text-white text-lg font-bold outline-none placeholder:text-slate-800"
+                        className="flex-1 bg-transparent px-5 py-3.5 text-slate-900 dark:text-white text-lg font-bold outline-none placeholder:text-slate-400 dark:placeholder:text-slate-700"
                         maxLength={9}
                         disabled={processing}
                     />
                 </div>
                 
                 {isInvalid && (
-                    <p className="text-xs text-rose-400 flex items-center gap-1.5 px-1">
+                    <p className="text-xs text-rose-500 dark:text-rose-400 flex items-center gap-1.5 px-1">
                         <Info size={14} />
                         Número {method.toUpperCase()} inválido. Use prefixos corretos.
                     </p>
@@ -194,11 +206,11 @@ export const MobileMoneyForm = ({
                     disabled={processing}
                 >
                     <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all ${
-                        savePreference ? 'bg-indigo-600 border-indigo-600' : 'border-slate-800 bg-slate-950 group-hover:border-slate-700'
+                        savePreference ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 group-hover:border-slate-400 dark:group-hover:border-slate-700'
                     }`}>
                         {savePreference && <Check size={10} className="text-white" />}
                     </div>
-                    <span className="text-xs text-slate-400 font-medium">Salvar número para renovações futuras</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Salvar número para renovações futuras</span>
                 </button>
             </div>
 
@@ -243,12 +255,12 @@ export const CardPaymentView = ({
         animate={{ opacity: 1, y: 0 }}
         className="space-y-6 pt-4"
     >
-        <div className="p-6 bg-slate-900/20 border border-slate-800/80 rounded-2xl">
-            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+        <div className="p-6 bg-slate-50 dark:bg-slate-900/20 border border-slate-200 dark:border-slate-800/80 rounded-2xl">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
                 {method === 'payfast' ? (
-                    <>Você será redirecionado para o ambiente de checkout seguro do <span className="text-white font-bold">PayFast</span> para efetuar o pagamento em <span className="text-indigo-400 font-bold">ZAR</span>.</>
+                    <>Você será redirecionado para o ambiente de checkout seguro do <span className="text-slate-900 dark:text-white font-bold">PayFast</span> para efetuar o pagamento em <span className="text-indigo-600 dark:text-indigo-400 font-bold">ZAR</span>.</>
                 ) : (
-                    <>Você será redirecionado para a página segura de pagamento da <span className="text-white font-bold">Debito.co.mz</span> para concluir sua compra usando <span className="text-indigo-400 font-bold">Visa ou Mastercard</span>.</>
+                    <>Você será redirecionado para a página segura de pagamento da <span className="text-slate-900 dark:text-white font-bold">Debito.co.mz</span> para concluir sua compra usando <span className="text-indigo-600 dark:text-indigo-400 font-bold">Visa ou Mastercard</span>.</>
                 )}
             </p>
             
@@ -257,7 +269,7 @@ export const CardPaymentView = ({
                 placeholder="Contato telefónico de referência"
             />
             
-            <div className="mt-5 flex items-center gap-4 py-3 opacity-40 border-t border-slate-800/60">
+            <div className="mt-5 flex items-center gap-4 py-3 opacity-60 border-t border-slate-200 dark:border-slate-800/60">
                 {method === 'payfast' ? (
                     <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500">Gateway PayFast Autenticado</span>
                 ) : (
@@ -284,7 +296,7 @@ export const CardPaymentView = ({
     </motion.div>
 );
 
-export const PollingOverlay = ({ method, total }: { method: string; total: number }) => {
+export const PollingOverlay = ({ method, total, exchangeRate = 65 }: { method: string; total: number; exchangeRate?: number }) => {
     // We simulate step-by-step connection states for the interactive terminal:
     return (
         <motion.div 
@@ -292,37 +304,37 @@ export const PollingOverlay = ({ method, total }: { method: string; total: numbe
             animate={{ opacity: 1, scale: 1 }}
             className="mt-6 animate-in zoom-in-95 duration-500"
         >
-            <div className="relative group p-8 bg-slate-900/30 rounded-[32px] border border-slate-800/80 flex flex-col items-center overflow-hidden">
+            <div className="relative group p-8 bg-white dark:bg-slate-900/30 rounded-[32px] border border-slate-200 dark:border-slate-800/80 shadow-xl flex flex-col items-center overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-cyan-500 to-indigo-500 animate-pulse" />
                 
                 <div className="relative mb-6">
-                    <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 shadow-xl">
+                    <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xl">
                         <Smartphone size={32} className="animate-bounce" />
                     </div>
                 </div>
 
                 <div className="w-full text-center space-y-6">
                     <div>
-                        <h3 className="text-xl font-black text-white mb-2 leading-none uppercase tracking-tight">Pedido Enviado</h3>
-                        <p className="text-slate-400 text-xs max-w-[280px] leading-relaxed mx-auto">
-                            Lançamos um pedido de pagamento de <span className="text-white font-bold">MT {total.toFixed(2)}</span> para o seu celular via <span className="capitalize text-indigo-400 font-bold">{method}</span>.
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 leading-none uppercase tracking-tight">Pedido Enviado</h3>
+                        <p className="text-slate-600 dark:text-slate-400 text-xs max-w-[280px] leading-relaxed mx-auto">
+                            Lançamos um pedido de pagamento de <span className="text-slate-900 dark:text-white font-bold font-mono">$ {total.toFixed(2)} USD</span> (~ MT {(total * exchangeRate).toFixed(0)} MZN) para o seu celular via <span className="capitalize text-indigo-600 dark:text-indigo-400 font-bold">{method}</span>.
                         </p>
                     </div>
 
                     {/* Step-by-step Interactive Billing Terminal */}
-                    <div className="bg-slate-950/80 border border-slate-900 rounded-2xl p-4 text-left space-y-4 max-w-xs mx-auto">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block border-b border-slate-900 pb-2">Status do Terminal</span>
+                    <div className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-900 rounded-2xl p-4 text-left space-y-4 max-w-xs mx-auto shadow-sm">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block border-b border-slate-200 dark:border-slate-900 pb-2">Status do Terminal</span>
                         
                         <div className="space-y-3 text-xs">
-                            <div className="flex items-center justify-between text-emerald-400">
-                                <span className="font-medium">1. Inicializando Conexão</span>
+                            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                                <span className="font-semibold">1. Inicializando Conexão</span>
                                 <CheckCircle2 size={14} className="flex-shrink-0" />
                             </div>
-                            <div className="flex items-center justify-between text-emerald-400">
-                                <span className="font-medium">2. Criando Transação</span>
+                            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                                <span className="font-semibold">2. Criando Transação</span>
                                 <CheckCircle2 size={14} className="flex-shrink-0" />
                             </div>
-                            <div className="flex items-center justify-between text-indigo-400 font-semibold">
+                            <div className="flex items-center justify-between text-indigo-600 dark:text-indigo-400 font-bold">
                                 <span className="font-medium">3. Aguardando PIN no celular</span>
                                 <Loader2 size={14} className="animate-spin flex-shrink-0" />
                             </div>

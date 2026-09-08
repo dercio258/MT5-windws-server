@@ -69,7 +69,7 @@ export const RecentTrades = () => {
                         const date = new Date(trade.close_time || (trade.sell_time ? trade.sell_time * 1000 : Date.now()));
 
                         return (
-                            <div key={trade.ticket} className="bg-slate-800/40 p-4 rounded-lg border border-slate-800/50 hover:border-emerald-500/30 transition-all">
+                            <div key={trade.ticket} className="bg-[#0C0D12]/80 p-4 rounded-xl border border-white/[0.08] hover:border-[rgba(16,185,129,0.3)] transition-all">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-10 h-10 rounded-lg ${isWin ? 'bg-emerald-500/10' : 'bg-rose-500/10'} flex items-center justify-center`}>

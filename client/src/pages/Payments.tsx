@@ -105,7 +105,7 @@ const ReceiptModal = ({ payment, onClose }: { payment: Payment; onClose: () => v
                     </div>
                     <div className="border-t border-slate-800/50 my-2 pt-2 flex justify-between text-sm">
                         <span className="text-slate-400 font-sans font-semibold">Total Pago:</span>
-                        <span className="text-indigo-400 font-bold">MT {payment.amount.toFixed(2)}</span>
+                        <span className="text-indigo-400 font-bold">$ {payment.amount.toFixed(2)} USD</span>
                     </div>
                 </div>
 
@@ -306,7 +306,7 @@ export const Payments = () => {
                         {activeSub ? (
                             <div className="space-y-3 pt-2">
                                 <div className="text-3xl font-black text-white font-mono">
-                                    MT {activeSub.amount.toFixed(2)}
+                                    $ {activeSub.amount.toFixed(2)} USD
                                 </div>
                                 <div className="space-y-1.5 text-xs">
                                     <div className="flex justify-between">
@@ -412,7 +412,7 @@ export const Payments = () => {
                                                 </div>
                                             </td>
                                             <td className="p-6 text-right font-mono font-bold text-slate-200">
-                                                MT {payment.amount.toFixed(2)}
+                                                $ {payment.amount.toFixed(2)} USD
                                             </td>
                                             <td className="p-6 text-center">
                                                 <button 

@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { SocketProvider } from './context/SocketContext';
+import { AccountProvider } from './context/AccountContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MainLayout } from './layouts/MainLayout';
@@ -22,6 +24,7 @@ import { Journal } from './pages/Journal';
 import { Payments } from './pages/Payments';
 import { Pricing } from './pages/Pricing';
 import { Configuration } from './pages/Configuration';
+import { Profile } from './pages/Profile';
 import { AddTrades } from './pages/AddTrades';
 import { Trades } from './pages/Trades';
 import { TradeDetails } from './pages/TradeDetails';
@@ -32,6 +35,7 @@ import { Notifications } from './pages/Notifications';
 import { Network } from './pages/Network';
 import { Backtest } from './pages/Backtest';
 import { Reports } from './pages/Reports';
+import { Leaderboard } from './pages/Leaderboard';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { GuestRoute } from './components/GuestRoute';
 import { Landing } from './pages/Landing';
@@ -47,6 +51,7 @@ import { AdminFinance } from './pages/admin/AdminFinance';
 import { AdminPlans } from './pages/admin/AdminPlans';
 import { AdminNotifications } from './pages/admin/AdminNotifications';
 import { AdminWhatsApp } from './pages/admin/AdminWhatsApp';
+import { AdminCalendar } from './pages/admin/AdminCalendar';
 
 // Legal Pages
 import { LegalHub } from './pages/legal/LegalHub';
@@ -59,9 +64,11 @@ import { RefundPolicy } from './pages/legal/RefundPolicy';
 function App() {
     return (
         <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-                <SocketProvider>
-                    <BrowserRouter>
+            <ThemeProvider>
+                <AuthProvider>
+                    <SocketProvider>
+                        <AccountProvider>
+                            <BrowserRouter>
                         <Routes>
                             {/* Public Routes */}
                             <Route path="/" element={<Landing />} />
@@ -123,6 +130,7 @@ function App() {
                                 <Route path="/admin/whatsapp" element={<AdminWhatsApp />} />
                                 <Route path="/admin/finance" element={<AdminFinance />} />
                                 <Route path="/admin/plans" element={<AdminPlans />} />
+                                <Route path="/admin/calendar" element={<AdminCalendar />} />
                             </Route>
 
 
@@ -130,7 +138,9 @@ function App() {
                             {/* Protected App Routes (With Sidebar/Layout) */}
                             <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                                 <Route path="/dashboard" element={<Dashboard />} />
+                                <Route path="/profile" element={<Profile />} />
                                 <Route path="/journal" element={<Journal />} />
+                                <Route path="/leaderboard" element={<Leaderboard />} />
                                 <Route path="/payments" element={<Payments />} />
                                 <Route path="/configuration" element={<Configuration />} />
                                 <Route path="/network" element={<Network />} />
@@ -149,8 +159,10 @@ function App() {
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </Routes>
                     </BrowserRouter>
+                    </AccountProvider>
                 </SocketProvider>
             </AuthProvider>
+            </ThemeProvider>
             <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
     );

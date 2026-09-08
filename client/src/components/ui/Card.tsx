@@ -6,12 +6,12 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 export const Card = ({ children, glass = true, className = '', ...props }: CardProps) => {
     const glassStyle = glass
-        ? 'bg-slate-800/40 backdrop-blur-md border border-white/5'
-        : 'bg-slate-900 border border-slate-800';
+        ? 'bg-[#111319] backdrop-blur-md border border-white/[0.08] shadow-xl'
+        : 'bg-[#0C0D12] border border-white/[0.08]';
 
     return (
         <div
-            className={`rounded-xl p-6 ${glassStyle} ${className}`}
+            className={`rounded-2xl p-6 ${glassStyle} ${className}`}
             {...props}
         >
             {children}

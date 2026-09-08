@@ -17,8 +17,12 @@ interface AuthContextType {
         is_connected?: boolean;
         tier?: 'FREE' | 'BASIC' | 'PREMIUM';
         onboardingCompleted?: boolean;
+        hasUsedTrial?: boolean;
+        trialUsedAt?: string;
+        trialJustGranted?: boolean;
+        trialDays?: number;
     } | null;
-    updateUser: (data: Partial<{ avatarUrl: string; name: string; onboardingCompleted: boolean }>) => void;
+    updateUser: (data: Partial<{ avatarUrl: string; name: string; username: string; onboardingCompleted: boolean; hasUsedTrial: boolean }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
     };
 
-    const updateUser = (data: Partial<{ avatarUrl: string; name: string; onboardingCompleted: boolean }>) => {
+    const updateUser = (data: Partial<{ avatarUrl: string; name: string; username: string; onboardingCompleted: boolean }>) => {
         setUser(prev => prev ? { ...prev, ...data } : null);
     };
 

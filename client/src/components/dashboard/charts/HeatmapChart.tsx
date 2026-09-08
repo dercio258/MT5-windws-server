@@ -25,7 +25,7 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
     const hours = Array.from({ length: 24 }, (_, i) => `${i}h`);
 
     const getColor = (val: number) => {
-        if (Math.abs(val) < 0.01) return 'rgba(30, 41, 59, 0.2)'; // bg-slate-800/20
+        if (Math.abs(val) < 0.01) return 'rgba(148, 163, 184, 0.05)';
         if (val > 0) {
             if (val > 1000) return '#10b981'; // emerald-500
             if (val > 500) return '#059669'; // emerald-600
@@ -39,22 +39,22 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
 
     if (isLoading) {
         return (
-            <div className="w-full h-full min-h-[300px] flex items-center justify-center bg-slate-900/40 rounded-2xl border border-slate-800">
-                <div className="animate-pulse text-slate-500 text-sm">Carregando heatmap...</div>
+            <div className="w-full h-full min-h-[300px] flex items-center justify-center bg-[#111319] rounded-2xl border border-white/[0.08]">
+                <div className="animate-pulse text-slate-500 text-sm font-medium">Carregando heatmap...</div>
             </div>
         );
     }
 
     return (
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 p-6 rounded-2xl h-full flex flex-col shadow-xl">
+        <div className="bg-[#111319] border border-white/[0.08] p-6 rounded-2xl h-full flex flex-col shadow-xl">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-white font-bold text-lg">Distribuição de Lucratividade</h3>
-                    <p className="text-xs text-slate-500">Seu desempenho por dia e hora (GMT)</p>
+                    <h3 className="text-white font-bold text-base tracking-tight">Distribuição de Lucratividade</h3>
+                    <p className="text-xs text-slate-400">Seu desempenho por dia e hora (GMT)</p>
                 </div>
                 <div className="flex gap-4 items-center scale-75 md:scale-100 origin-right">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Perda</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Perda</span>
                         <div className="flex gap-0.5">
                             <div className="w-3 h-3 rounded-xs" style={{ backgroundColor: '#be123c' }}></div>
                             <div className="w-3 h-3 rounded-xs" style={{ backgroundColor: '#f43f5e' }}></div>
@@ -65,7 +65,7 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
                             <div className="w-3 h-3 rounded-xs" style={{ backgroundColor: '#10b981' }}></div>
                             <div className="w-3 h-3 rounded-xs" style={{ backgroundColor: '#047857' }}></div>
                         </div>
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Lucro</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Lucro</span>
                     </div>
                 </div>
             </div>
@@ -77,7 +77,7 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
                         <div className="w-12"></div>
                         <div className="flex-1 flex gap-1">
                             {hours.map((h, i) => (
-                                <div key={i} className="flex-1 text-[9px] text-slate-500 text-center font-bold">
+                                <div key={i} className="flex-1 text-[9px] text-slate-400 text-center font-bold">
                                     {i % 2 === 0 ? h : ''}
                                 </div>
                             ))}
@@ -98,8 +98,8 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
                                         return (
                                             <div
                                                 key={hourIdx}
-                                                title={`${days[dayIdx]} ${hourIdx}h: ${val.toFixed(2)} MT (${count} trades)`}
-                                                className="flex-1 h-8 rounded-[2px] transition-all cursor-crosshair transform hover:scale-110 hover:z-10 hover:ring-1 hover:ring-white/30"
+                                                title={`${days[dayIdx]} ${hourIdx}h: ${val >= 0 ? '+' : ''}$${val.toFixed(2)} USD (${count} trades)`}
+                                                className="flex-1 h-8 rounded-[2px] transition-all cursor-crosshair transform hover:scale-110 hover:z-10 hover:ring-1 hover:ring-emerald-400/50"
                                                 style={{ backgroundColor: getColor(val) }}
                                             />
                                         );
@@ -111,12 +111,12 @@ export const HeatmapChart = ({ endDate }: { endDate?: string }) => {
                 </div>
             </div>
             
-            <div className="mt-6 pt-4 border-top border-slate-800/50 flex items-center justify-between">
-                <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+            <div className="mt-6 pt-4 border-t border-[rgba(148,163,184,0.08)] flex items-center justify-between">
+                <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#8B5CF6]"></span>
                     Métricas baseadas em {data?.counts.flat().reduce((acc, c) => acc + (c?.val || 0), 0) || 0} operações encerradas
                 </div>
-                <p className="text-[10px] text-slate-600 italic">
+                <p className="text-[10px] text-slate-500 italic">
                     Cores intensas indicam maior volume de lucro/prejuízo
                 </p>
             </div>

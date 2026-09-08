@@ -52,13 +52,13 @@ export const BrokerSelector = ({ onSelect }: BrokerSelectorProps) => {
     return (
         <div className="space-y-6">
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={20} />
                 <input
                     type="text"
                     placeholder="Search your broker..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-100 focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-slate-600"
+                    className="w-full bg-[#08090C] border border-white/[0.08] rounded-xl py-3 pl-10 pr-4 text-[#F3F4F6] focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-[#6B7280]"
                 />
             </div>
 
@@ -69,10 +69,10 @@ export const BrokerSelector = ({ onSelect }: BrokerSelectorProps) => {
                         <div
                             key={broker.id}
                             onClick={() => onSelect(broker)}
-                            className="group relative bg-slate-900/50 border border-slate-800/50 hover:bg-slate-800/50 hover:border-emerald-500/30 rounded-xl p-5 cursor-pointer transition-all flex items-center gap-4 overflow-hidden"
+                            className="group relative bg-[#111319] border border-white/[0.08] hover:bg-[#161822] hover:border-emerald-500/40 rounded-xl p-5 cursor-pointer transition-all flex items-center gap-4 overflow-hidden"
                         >
                             {isLocked && (
-                                <div className="absolute top-3 right-3 text-slate-500 group-hover:text-emerald-400 transition-colors">
+                                <div className="absolute top-3 right-3 text-[#6B7280] group-hover:text-emerald-400 transition-colors">
                                     <Lock size={14} />
                                 </div>
                             )}
@@ -83,7 +83,7 @@ export const BrokerSelector = ({ onSelect }: BrokerSelectorProps) => {
                         </div>
 
                         <div className="relative">
-                            <h3 className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                            <h3 className="font-bold text-[#F3F4F6] group-hover:text-emerald-400 transition-colors">
                                 {broker.name}
                             </h3>
                             <div className="flex items-center gap-2 mt-1">
@@ -94,7 +94,7 @@ export const BrokerSelector = ({ onSelect }: BrokerSelectorProps) => {
                                     {broker.type === 'AUTO_SYNC' ? 'AUTO SYNC' : 'MANUAL'}
                                 </span>
                             </div>
-                            <p className="text-xs text-slate-500 mt-1 line-clamp-1">{broker.description}</p>
+                            <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-1">{broker.description}</p>
                         </div>
                         </div>
                     );
@@ -103,7 +103,7 @@ export const BrokerSelector = ({ onSelect }: BrokerSelectorProps) => {
 
             {filteredBrokers.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-slate-500">No brokers found matching "{search}"</p>
+                    <p className="text-[#9CA3AF]">No brokers found matching "{search}"</p>
                 </div>
             )}
         </div>

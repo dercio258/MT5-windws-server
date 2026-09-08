@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useAccount } from '../context/AccountContext';
 import { CalendarWidget } from '../components/journal/CalendarWidget';
 import { JournalEditor } from '../components/journal/JournalEditor';
 
@@ -40,6 +41,7 @@ export const Journal = () => {
     const navigate = useNavigate();
     // State
     const { token } = useAuth();
+    const { selectedAccountId } = useAccount();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [viewMode, setViewMode] = useState<'journal' | 'analysis'>('journal');
@@ -80,17 +82,21 @@ export const Journal = () => {
         if (token) {
             fetchTrades();
         }
-    }, [token]);
+    }, [token, selectedAccountId]);
 
     useEffect(() => {
         if (selectedDate && token) {
             fetchTechnicalJournal();
         }
-    }, [selectedDate, token]);
+    }, [selectedDate, token, selectedAccountId]);
 
     const fetchTrades = async () => {
         try {
-            const res = await api.get('/dashboard/trades');
+            const params: any = {};
+            if (selectedAccountId) {
+                params.accountId = selectedAccountId;
+            }
+            const res = await api.get('/dashboard/trades', { params });
             if (Array.isArray(res.data)) {
                 const mapped = res.data.map((t: any) => ({
                     ...t, // Keep original fields for editing
@@ -154,7 +160,11 @@ export const Journal = () => {
     const fetchTechnicalJournal = async () => {
         try {
             const dateStr = selectedDate.toISOString().split('T')[0];
-            const res = await api.get(`/dashboard/technical-journal/${dateStr}`);
+            const params: any = {};
+            if (selectedAccountId) {
+                params.accountId = selectedAccountId;
+            }
+            const res = await api.get(`/dashboard/technical-journal/${dateStr}`, { params });
             const data = res.data;
 
             if (data) {
@@ -193,7 +203,10 @@ export const Journal = () => {
         try {
             setSavingJournal(true);
             const dateStr = selectedDate.toISOString().split('T')[0];
-            const payload = { ...techForm, date: dateStr };
+            const payload: any = { ...techForm, date: dateStr };
+            if (selectedAccountId) {
+                payload.accountId = selectedAccountId;
+            }
 
             await api.post(`/dashboard/technical-journal`, payload);
         } catch (error) {
@@ -223,23 +236,23 @@ export const Journal = () => {
             {/* Header with Tabs */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-white mb-1 flex items-center gap-3">
-                        <BookOpen className="text-indigo-400" /> Diário de Trading
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-3">
+                        <BookOpen className="text-indigo-500 dark:text-indigo-400" /> Diário de Trading
                     </h1>
-                    <p className="text-slate-400 text-sm">Registro técnico e análise de performance.</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Registro técnico e análise de performance.</p>
                 </div>
 
-                <div className="bg-slate-900/50 p-1 rounded-xl border border-slate-800 flex">
+                <div className="bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-800 flex">
                     <button
                         onClick={() => setViewMode('journal')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'journal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'journal' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                     >
                         <LayoutGrid size={16} /> Diário
                     </button>
                     <button
                         onClick={() => setViewMode('analysis')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'analysis' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'analysis' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                     >
                         <Edit3 size={16} /> Anotações
@@ -248,10 +261,10 @@ export const Journal = () => {
             </div>
 
             {viewMode === 'analysis' ? (
-                <div className="flex flex-col bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl">
+                <div className="flex flex-col bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm dark:shadow-2xl">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <Edit3 className="text-indigo-400" /> Anotações Detalhadas
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Edit3 className="text-indigo-500 dark:text-indigo-400" /> Anotações Detalhadas
                         </h3>
                         <button
                             onClick={handleSaveJournal}
@@ -262,7 +275,7 @@ export const Journal = () => {
                             Salvar
                         </button>
                     </div>
-                    <div className="flex-1 overflow-hidden rounded-xl border border-slate-700">
+                    <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
                         <JournalEditor
                             value={techForm.notes || ''}
                             onEditorChange={(content) => setTechForm({ ...techForm, notes: content })}
@@ -290,13 +303,13 @@ export const Journal = () => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                         {/* Trade List for Selected Day */}
-                        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 flex flex-col shadow-xl min-h-[400px]">
+                        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col shadow-sm dark:shadow-xl min-h-[400px]">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                                    <Clock className="text-emerald-400" size={16} />
+                                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <Clock className="text-emerald-500 dark:text-emerald-400" size={16} />
                                     {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                                 </h2>
-                                <span className="text-xs font-mono text-slate-500 bg-slate-800/50 px-2 py-1 rounded">
+                                <span className="text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 px-2 py-1 rounded border border-slate-200/80 dark:border-slate-700/50">
                                     {filteredTrades.length} Trades
                                 </span>
                             </div>
@@ -307,16 +320,19 @@ export const Journal = () => {
                                         <div
                                             key={t.ticket}
                                             onClick={() => setSelectedTrade(t)}
-                                            className={`p-3 rounded-xl border cursor-pointer hover:bg-slate-800/50 transition-all ${selectedTrade?.ticket === t.ticket ? 'bg-indigo-500/10 border-indigo-500/30 ring-1 ring-indigo-500/20' : 'bg-slate-950/30 border-slate-800'
-                                                }`}
+                                            className={`p-3 rounded-xl border cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all ${
+                                                selectedTrade?.ticket === t.ticket 
+                                                    ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-300 dark:border-indigo-500/30 ring-1 ring-indigo-500/20' 
+                                                    : 'bg-slate-50/70 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800'
+                                            }`}
                                         >
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="text-xs font-bold text-slate-300">{t.symbol}</span>
-                                                <span className={`text-xs font-mono font-bold ${t.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-300">{t.symbol}</span>
+                                                <span className={`text-xs font-mono font-bold ${t.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                                                     {t.profit >= 0 ? '+' : ''}{t.profit.toFixed(2)}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between items-center text-[10px] text-slate-500">
+                                            <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400">
                                                 <span>{t.type} • {t.volume}</span>
                                                 <span>{new Date(t.close_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
@@ -324,7 +340,7 @@ export const Journal = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-600">
+                                <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-600">
                                     <p className="text-xs italic">Nenhum trade para este dia.</p>
                                 </div>
                             )}
@@ -332,12 +348,12 @@ export const Journal = () => {
 
                         {/* Per-Trade Editor (appears when selected) */}
                         {selectedTrade ? (
-                            <div className="bg-slate-900/60 backdrop-blur-xl border border-indigo-500/30 rounded-3xl p-6 flex flex-col shadow-xl animate-in slide-in-from-right-4 relative">
+                            <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-indigo-200 dark:border-indigo-500/30 rounded-3xl p-6 flex flex-col shadow-sm dark:shadow-xl animate-in slide-in-from-right-4 relative">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <Zap className="text-indigo-400" size={18} /> Trade #{selectedTrade.ticket}
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <Zap className="text-indigo-500 dark:text-indigo-400" size={18} /> Trade #{selectedTrade.ticket}
                                     </h3>
-                                    <button onClick={() => setSelectedTrade(null)} className="text-slate-500 hover:text-white">
+                                    <button onClick={() => setSelectedTrade(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white">
                                         <X size={20} />
                                     </button>
                                 </div>
@@ -345,7 +361,7 @@ export const Journal = () => {
                                 {/* Step Indicators */}
                                 <div className="flex gap-2 mb-6">
                                     {[1, 2, 3].map(step => (
-                                        <div key={step} className={`h-1 flex-1 rounded-full ${tradeEditStep >= step ? 'bg-indigo-500' : 'bg-slate-800'}`} />
+                                        <div key={step} className={`h-1 flex-1 rounded-full ${tradeEditStep >= step ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800'}`} />
                                     ))}
                                 </div>
 
@@ -501,14 +517,14 @@ export const Journal = () => {
                     </div>
 
                     {/* Bottom Row: Technical Journal Form */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                    <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm dark:shadow-2xl">
+                        <div className="flex items-center gap-3 mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
                             <div className="p-2 bg-indigo-500/10 rounded-lg">
-                                <Edit3 className="text-indigo-400" size={20} />
+                                <Edit3 className="text-indigo-500 dark:text-indigo-400" size={20} />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white">Análise Técnica</h3>
-                                <p className="text-slate-400 text-xs">Registro do dia {selectedDate.toLocaleDateString()}</p>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Análise Técnica</h3>
+                                <p className="text-slate-500 dark:text-slate-400 text-xs">Registro do dia {selectedDate.toLocaleDateString()}</p>
                             </div>
                             <div className="ml-auto">
                                 <button
@@ -527,7 +543,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Contexto</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2.5 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.marketTrend}
                                         onChange={e => setTechForm({ ...techForm, marketTrend: e.target.value })}
                                     >
@@ -544,7 +560,7 @@ export const Journal = () => {
                                             <button
                                                 key={v}
                                                 onClick={() => setTechForm(p => ({ ...p, volatility: v }))}
-                                                className={`flex-1 py-1.5 text-xs rounded-lg border font-medium transition-all ${techForm.volatility === v ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
+                                                className={`flex-1 py-1.5 text-xs rounded-lg border font-medium transition-all ${techForm.volatility === v ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                                             >
                                                 {v}
                                             </button>
@@ -554,7 +570,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Estratégia Principal</label>
                                     <input
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2.5 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.strategyUsed}
                                         onChange={e => setTechForm({ ...techForm, strategyUsed: e.target.value })}
                                         placeholder="Ex: Breakout H1"
@@ -563,7 +579,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Qualidade do Setup</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2.5 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.setupQuality}
                                         onChange={e => setTechForm({ ...techForm, setupQuality: e.target.value })}
                                     >
@@ -576,7 +592,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Sessão</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2.5 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.session}
                                         onChange={e => setTechForm({ ...techForm, session: e.target.value })}
                                     >
@@ -593,7 +609,7 @@ export const Journal = () => {
                                             <button
                                                 key={n}
                                                 onClick={() => setTechForm(p => ({ ...p, rating: n }))}
-                                                className={`flex-1 h-10 rounded border flex items-center justify-center font-bold text-xs ${techForm.rating >= n ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/10' : 'bg-slate-800 border-slate-700 text-slate-600'}`}
+                                                className={`flex-1 h-10 rounded border flex items-center justify-center font-bold text-xs ${techForm.rating >= n ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm shadow-indigo-500/10' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600'}`}
                                             >
                                                 {n}
                                             </button>
@@ -606,7 +622,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Entrada</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.entryPrecision}
                                         onChange={e => setTechForm({ ...techForm, entryPrecision: e.target.value })}
                                     >
@@ -619,7 +635,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Saída</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.tradeExit}
                                         onChange={e => setTechForm({ ...techForm, tradeExit: e.target.value })}
                                     >
@@ -633,7 +649,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Gestão de Risco</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.riskManagement}
                                         onChange={e => setTechForm({ ...techForm, riskManagement: e.target.value })}
                                     >
@@ -646,7 +662,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Estado Emocional</label>
                                     <select
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.emotionalState}
                                         onChange={e => setTechForm({ ...techForm, emotionalState: e.target.value })}
                                     >
@@ -663,7 +679,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-rose-500 mb-1 block">Erros Cometidos</label>
                                     <textarea
-                                        className="w-full bg-rose-500/5 border-rose-500/20 rounded-lg text-sm p-3 text-rose-100 outline-none h-20 resize-none focus:border-rose-500 transition-colors placeholder-rose-900/50"
+                                        className="w-full bg-rose-50 dark:bg-rose-500/5 border border-rose-200 dark:border-rose-500/20 rounded-lg text-sm p-3 text-rose-950 dark:text-rose-100 outline-none h-20 resize-none focus:border-rose-500 transition-colors placeholder:text-rose-400 dark:placeholder:text-rose-900/50"
                                         value={techForm.mistakes || ''}
                                         onChange={e => setTechForm({ ...techForm, mistakes: e.target.value })}
                                         placeholder="Ex: Entrei por FOMO..."
@@ -672,7 +688,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-rose-500 mb-1 block">Regras Quebradas</label>
                                     <textarea
-                                        className="w-full bg-rose-500/5 border-rose-500/20 rounded-lg text-sm p-3 text-rose-100 outline-none h-20 resize-none focus:border-rose-500 transition-colors placeholder-rose-900/50"
+                                        className="w-full bg-rose-50 dark:bg-rose-500/5 border border-rose-200 dark:border-rose-500/20 rounded-lg text-sm p-3 text-rose-950 dark:text-rose-100 outline-none h-20 resize-none focus:border-rose-500 transition-colors placeholder:text-rose-400 dark:placeholder:text-rose-900/50"
                                         value={techForm.rulesBroken || ''}
                                         onChange={e => setTechForm({ ...techForm, rulesBroken: e.target.value })}
                                         placeholder="Ex: Não esperei pelo fecho de vela..."
@@ -681,7 +697,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Lições Aprendidas</label>
                                     <textarea
-                                        className="w-full bg-emerald-500/5 border-emerald-500/20 rounded-lg text-sm p-3 text-emerald-100 outline-none h-20 resize-none focus:border-emerald-500 transition-colors placeholder-emerald-900/50"
+                                        className="w-full bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 rounded-lg text-sm p-3 text-emerald-950 dark:text-emerald-100 outline-none h-20 resize-none focus:border-emerald-500 transition-colors placeholder:text-emerald-400 dark:placeholder:text-emerald-900/50"
                                         value={techForm.lessons || ''}
                                         onChange={e => setTechForm({ ...techForm, lessons: e.target.value })}
                                         placeholder="O que levaste desta sessão..."
@@ -690,7 +706,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-blue-500 mb-1 block">Plano de Ação</label>
                                     <textarea
-                                        className="w-full bg-blue-500/5 border-blue-500/20 rounded-lg text-sm p-3 text-blue-100 outline-none h-20 resize-none focus:border-blue-500 transition-colors placeholder-blue-900/50"
+                                        className="w-full bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 rounded-lg text-sm p-3 text-blue-950 dark:text-blue-100 outline-none h-20 resize-none focus:border-blue-500 transition-colors placeholder:text-blue-400 dark:placeholder:text-blue-900/50"
                                         value={techForm.actionPlan || ''}
                                         onChange={e => setTechForm({ ...techForm, actionPlan: e.target.value })}
                                         placeholder="O que vais fazer melhor da próxima vez..."
@@ -702,7 +718,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Preparação Pré-Mercado</label>
                                     <input
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.preMarketPrep}
                                         onChange={e => setTechForm({ ...techForm, preMarketPrep: e.target.value })}
                                         placeholder="Como te preparaste?"
@@ -711,7 +727,7 @@ export const Journal = () => {
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Contexto de Mercado (Resumo)</label>
                                     <input
-                                        className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
                                         value={techForm.marketContext}
                                         onChange={e => setTechForm({ ...techForm, marketContext: e.target.value })}
                                         placeholder="Ex: NFP + CPI no mesmo dia"
@@ -722,7 +738,7 @@ export const Journal = () => {
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Anotações do Dia / Resumo</label>
                                 <textarea
-                                    className="w-full bg-slate-800 border-slate-700 rounded-lg text-sm p-3 text-white outline-none h-20 resize-none focus:border-indigo-500 transition-colors"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-3 text-slate-800 dark:text-white outline-none h-20 resize-none focus:border-indigo-500 transition-colors"
                                     value={techForm.notes || ''}
                                     onChange={e => setTechForm({ ...techForm, notes: e.target.value })}
                                     placeholder="Breve comentário..."
