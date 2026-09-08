@@ -1,4 +1,4 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, Req, Logger, BadRequestException } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, Req, Logger, BadRequestException, Query } from '@nestjs/common';
 import { FastifyFileInterceptor } from '../common/interceptors/fastify-file.interceptor';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ReportParserService } from './report-parser.service';
@@ -21,11 +21,21 @@ export class ImportController {
 
     @Post('report')
     @UseInterceptors(new FastifyFileInterceptor('file'))
-    async uploadReport(@UploadedFile() file: any, @Req() req) {
-        if (!file) throw new BadRequestException('No file uploaded');
+    async uploadReport(
+        @UploadedFile() file: any,
+        @Req() req,
+        @Query('accountId') queryAccountId?: string
+    ) {
+        if (!file) throw new BadRequestException('Nenhum arquivo enviado');
 
         const userId = req.user.id;
-        this.logger.log(`Processing report for User ${userId}, Size: ${file.size} bytes`);
+        // Resolve target account: query parameter, body field or x-account-id header
+        let targetAccountId = queryAccountId || req.body?.accountId || (req.headers['x-account-id'] as string) || undefined;
+        if (targetAccountId === 'all' || targetAccountId === 'undefined' || targetAccountId === 'null' || targetAccountId === '') {
+            targetAccountId = undefined;
+        }
+
+        this.logger.log(`Processando relatório para Usuário ${userId}, Conta solicitada: ${targetAccountId || 'Auto (Principal)'}, Tamanho: ${file.size} bytes`);
 
         let trades = [];
 
@@ -43,35 +53,34 @@ export class ImportController {
 
             const userPlan = await this.planPermissionService.getUserPlan(userId);
 
-            if (file.mimetype.includes('html') || file.originalname.endsWith('.html') || file.originalname.endsWith('.htm')) {
+            if (file.mimetype?.includes('html') || file.originalname?.endsWith('.html') || file.originalname?.endsWith('.htm')) {
                 trades = this.reportParser.parseHtml(content);
-            } else if (file.mimetype.includes('csv') || file.originalname.endsWith('.csv')) {
+            } else if (file.mimetype?.includes('csv') || file.originalname?.endsWith('.csv')) {
                 trades = this.reportParser.parseCsv(content);
             } else {
-                throw new BadRequestException('Unsupported file format. Please upload .html or .csv');
+                throw new BadRequestException('Formato de arquivo não suportado. Por favor envie .html ou .csv');
             }
 
             if (trades.length === 0) {
-                this.logger.warn('No trades parsed from file');
-                return { success: false, message: 'No trades found in the report.' };
+                this.logger.warn('Nenhum trade encontrado no arquivo');
+                return { success: false, count: 0, message: 'Nenhuma operação encontrada no relatório.' };
             }
 
-            this.logger.log(`Parsed ${trades.length} trades. Sample: ${JSON.stringify(trades[0])}`);
+            this.logger.log(`Analisadas ${trades.length} operações. Salvando diretamente na conta de destino...`);
 
-            // Save trades
-            const result = await this.mt5Service.saveHistory(trades, ImportMethod.FILE, userId);
-
-            this.logger.log(`Import result: ${JSON.stringify(result)}`);
+            // Save trades com a conta de destino
+            const result = await this.mt5Service.saveHistory(trades, ImportMethod.FILE, userId, targetAccountId);
 
             return {
                 success: true,
-                message: `Importamos ${trades.length} operações! Agora, acesse o Diário para registrar suas anotações e gerenciamento de risco para gerar seu relatório de performance.`,
-                count: trades.length
+                message: result.message || `Importamos ${result.count} operações com sucesso!`,
+                count: result.count,
+                accountId: result.accountId || targetAccountId
             };
 
         } catch (e) {
-            this.logger.error(`Import failed: ${e.message}`);
-            throw new BadRequestException(`Import failed: ${e.message}`);
+            this.logger.error(`Falha na importação: ${e.message}`);
+            throw new BadRequestException(`Falha na importação: ${e.message}`);
         }
     }
 }

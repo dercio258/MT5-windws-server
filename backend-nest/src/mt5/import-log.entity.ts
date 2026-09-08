@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { UserEntity } from '../users/user.entity';
+import { AccountEntity } from '../account/account.entity';
 
 export enum ImportMethod {
     EA = 'EA',
@@ -26,6 +27,13 @@ export class ImportLog {
     @ManyToOne(() => UserEntity)
     @JoinColumn({ name: 'userId' })
     user: UserEntity;
+
+    @Column({ name: 'account_id', nullable: true })
+    accountId: string;
+
+    @ManyToOne(() => AccountEntity, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'account_id' })
+    account: AccountEntity;
 
     @Column({
         type: 'enum',

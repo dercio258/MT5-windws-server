@@ -3,7 +3,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { join, isAbsolute } from 'path';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -29,6 +28,8 @@ import { AiModule } from './ai/ai.module';
 
 import { AlertsModule } from './alerts/alerts.module';
 import { ClickHouseModule } from './clickhouse/clickhouse.module';
+import { EconomicCalendarModule } from './economic-calendar/economic-calendar.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 
 @Module({
   imports: [
@@ -77,32 +78,6 @@ import { ClickHouseModule } from './clickhouse/clickhouse.module';
       }),
       inject: [ConfigService],
     }),
-    ServeStaticModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const customPath = configService.get<string>('FRONTEND_BUILD_PATH');
-        const rootPath = customPath 
-          ? (isAbsolute(customPath) ? customPath : join(process.cwd(), customPath))
-          : join(__dirname, '..', '..', 'client', 'dist');
-        
-        const uploadsPath = join(__dirname, '..', 'uploads');
-        
-        return [
-          {
-            rootPath,
-            exclude: ['/api/(.*)'],
-          },
-          {
-            rootPath: uploadsPath,
-            serveRoot: '/uploads',
-            serveStaticOptions: {
-              decorateReply: false,
-            } as any
-          }
-        ];
-      },
-      inject: [ConfigService],
-    }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -130,6 +105,8 @@ import { ClickHouseModule } from './clickhouse/clickhouse.module';
     DerivModule,
     AiModule,
     AlertsModule,
+    EconomicCalendarModule,
+    LeaderboardModule,
   ],
 
   controllers: [],

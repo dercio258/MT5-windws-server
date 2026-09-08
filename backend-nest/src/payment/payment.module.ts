@@ -26,9 +26,10 @@ import { PlanGuard } from './plan.guard';
 @Module({
     imports: [
         TypeOrmModule.forFeature([PaymentEntity, AccountEntity, Subscription, SubscriptionPlanConfig, UserEntity]),
-        BullModule.registerQueue({
-            name: 'subscription-queue',
-        }),
+        BullModule.registerQueue(
+            { name: 'subscription-queue' },
+            { name: 'email-queue' }
+        ),
         UsersModule,
         ConfigModule,
         forwardRef(() => AlertsModule),

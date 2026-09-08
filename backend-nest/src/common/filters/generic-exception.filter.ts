@@ -1,13 +1,29 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { FastifyReply } from 'fastify';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { join } from 'path';
+import * as fs from 'fs';
 
 @Catch()
 export class GenericExceptionFilter implements ExceptionFilter {
     private readonly logger = new Logger(GenericExceptionFilter.name);
+    private readonly clientDist = fs.existsSync(join(process.cwd(), '..', 'client', 'dist'))
+        ? join(process.cwd(), '..', 'client', 'dist')
+        : join(__dirname, '..', '..', '..', 'client', 'dist');
 
     catch(exception: any, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse<FastifyReply>();
+        const request = ctx.getRequest<FastifyRequest>();
+
+        const url = request.raw?.url || request.url || '';
+
+        // SPA Fallback: rotas de navegação que não são /api entregam o index.html
+        if (exception instanceof NotFoundException && !url.startsWith('/api')) {
+            const indexPath = join(this.clientDist, 'index.html');
+            if (fs.existsSync(indexPath)) {
+                return response.status(HttpStatus.OK).type('text/html').send(fs.createReadStream(indexPath));
+            }
+        }
 
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
         let message = 'Ocorreu um erro interno no servidor. Por favor, tente novamente mais tarde.';

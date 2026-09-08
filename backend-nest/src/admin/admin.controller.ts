@@ -134,6 +134,19 @@ export class AdminController {
         return this.subscriptionService.createPlanConfig(body);
     }
 
+    // --- Trial Campaign Management ---
+    @UseGuards(AdminAuthGuard)
+    @Get('trial-campaign')
+    async getTrialCampaign() {
+        return this.subscriptionService.getTrialCampaignStatus();
+    }
+
+    @UseGuards(AdminAuthGuard)
+    @Post('trial-campaign/toggle')
+    async toggleTrialCampaign(@Body() body: { enabled: boolean; days?: number }) {
+        return this.subscriptionService.toggleTrialCampaign(body.enabled, body.days);
+    }
+
     // --- User Subscription History ---
     @UseGuards(AdminAuthGuard)
     @Get('users/:id/subscriptions')

@@ -155,23 +155,85 @@ export class ReportParserService {
         return !isNaN(d.getTime());
     }
 
-    private normalizeDate(dateStr: string): Date | null {
-        if (!dateStr || dateStr.trim() === '') return null;
-        let cleanStr = dateStr.replace(/\./g, '-');
-        const d = new Date(cleanStr);
-        return isNaN(d.getTime()) ? null : d;
+    private normalizeDate(dateStr: any): Date | null {
+        if (dateStr === undefined || dateStr === null) return null;
+        if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+
+        // Numeric timestamp (seconds or milliseconds)
+        if (typeof dateStr === 'number' || /^\d{10,13}$/.test(dateStr.toString().trim())) {
+            const num = Number(dateStr);
+            const timestamp = num > 1e11 ? num : num * 1000;
+            const d = new Date(timestamp);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        const trimmed = dateStr.toString().trim().replace(/"/g, '');
+        if (!trimmed) return null;
+
+        // 1. Direct standard parse (handles ISO timestamps with or without ms, e.g. 2026-02-02T08:15:00.000)
+        const directDate = new Date(trimmed);
+        if (!isNaN(directDate.getTime())) {
+            const yr = directDate.getFullYear();
+            if (yr >= 1990 && yr <= 2100) return directDate;
+        }
+
+        // 2. Split date and time
+        const [datePart, ...restTime] = trimmed.split(/[ T]/);
+        const timePart = restTime.join(' ');
+
+        // 3. Match YYYY.MM.DD, YYYY-MM-DD, YYYY/MM/DD
+        const ymdMatch = datePart.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+        if (ymdMatch) {
+            const year = parseInt(ymdMatch[1], 10);
+            const month = parseInt(ymdMatch[2], 10) - 1;
+            const day = parseInt(ymdMatch[3], 10);
+            
+            let hours = 0, minutes = 0, seconds = 0;
+            if (timePart) {
+                const timeMatch = timePart.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+                if (timeMatch) {
+                    hours = parseInt(timeMatch[1], 10);
+                    minutes = parseInt(timeMatch[2], 10);
+                    seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+                }
+            }
+            const d = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+            if (!isNaN(d.getTime())) return d;
+        }
+
+        // 4. Match DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+        const dmyMatch = datePart.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+        if (dmyMatch) {
+            const day = parseInt(dmyMatch[1], 10);
+            const month = parseInt(dmyMatch[2], 10) - 1;
+            const year = parseInt(dmyMatch[3], 10);
+            
+            let hours = 0, minutes = 0, seconds = 0;
+            if (timePart) {
+                const timeMatch = timePart.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+                if (timeMatch) {
+                    hours = parseInt(timeMatch[1], 10);
+                    minutes = parseInt(timeMatch[2], 10);
+                    seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+                }
+            }
+            const d = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+            if (!isNaN(d.getTime())) return d;
+        }
+
+        return null;
     }
 
     parseCsv(content: string): any[] {
         this.logger.log('Parsing CSV Report...');
 
         // 1. Detect Journal Log (tradinglog format)
-        if (content.includes('ticket_id,message,event_type')) {
+        if (content.includes('ticket_id,message,event_type') || content.includes('ticket_id;message;event_type')) {
             return this.parseJournalLog(content);
         }
 
         // 2. Detect History Format (standard CSV export)
-        if (content.includes('ticket,opening_time_utc,closing_time_utc')) {
+        if (content.includes('ticket,opening_time_utc') || content.includes('ticket;opening_time_utc')) {
             return this.parseHistoryCsv(content);
         }
 
@@ -240,18 +302,25 @@ export class ReportParserService {
             const slCol = headerMap['sl'] ?? headerMap['stoploss'] ?? headerMap['s/l'];
             const tpCol = headerMap['tp'] ?? headerMap['takeprofit'] ?? headerMap['t/p'];
 
+            const parsedClosePrice = parseNum(cols[headerMap['closeprice'] ?? 9]);
+            const parsedProfit = parseNum(cols[headerMap['profit'] ?? 13]);
+            const parsedCloseTime = this.normalizeDate(closeTimeStr);
+            const isClosed = !!parsedCloseTime || parsedClosePrice > 0 || parsedProfit !== 0;
+            const finalCloseTime = parsedCloseTime || (isClosed && openTime ? new Date(openTime.getTime() + 5 * 60 * 1000) : null);
+
             trades.push({
                 ticket: ticket,
                 open_time: openTime,
+                close_time: finalCloseTime,
+                status: isClosed ? 'CLOSED' : 'OPEN',
                 type: typeStr,
                 volume: parseNum(cols[headerMap['size'] ?? headerMap['volume'] ?? 3]),
                 symbol: cleanSymbol,
                 open_price: parseNum(cols[headerMap['price'] ?? headerMap['openprice'] ?? 5]),
-                close_time: this.normalizeDate(closeTimeStr),
-                close_price: parseNum(cols[headerMap['closeprice'] ?? 9]),
+                close_price: parsedClosePrice,
                 commission: parseNum(cols[headerMap['commission'] ?? 10]),
                 swap: parseNum(cols[headerMap['swap'] ?? 12]),
-                profit: parseNum(cols[headerMap['profit'] ?? 13]),
+                profit: parsedProfit,
                 sl: slCol !== undefined ? parseNum(cols[slCol]) : 0,
                 tp: tpCol !== undefined ? parseNum(cols[tpCol]) : 0,
                 magic: 0,
@@ -325,40 +394,135 @@ export class ReportParserService {
 
     private parseHistoryCsv(content: string): any[] {
         this.logger.log('Detected History CSV format. Parsing...');
-        const lines = content.split('\n');
+        const cleanContent = content.replace(/^\uFEFF/, '');
+        const lines = cleanContent.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) return [];
+
+        // Delimiter detection (, vs ;)
+        const sampleLines = lines.slice(0, 5);
+        let commas = 0;
+        let semicolons = 0;
+        sampleLines.forEach(l => {
+            commas += (l.match(/,/g) || []).length;
+            semicolons += (l.match(/;/g) || []).length;
+        });
+        const delimiter = semicolons > commas ? ';' : ',';
+
+        const headerLine = lines[0].toLowerCase();
+        const headers = headerLine.split(delimiter).map(h => h.trim().replace(/"/g, ''));
+        const headerMap: Record<string, number> = {};
+        headers.forEach((h, idx) => {
+            headerMap[h] = idx;
+        });
+
         const trades = [];
+        const validTypes = ['buy', 'sell', 'buy limit', 'sell limit', 'buy stop', 'sell stop', 'balance', 'credit', 'correction'];
 
-        // Skip header
+        const parseNum = (val: any): number => {
+            if (val === undefined || val === null) return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+            let clean = val.toString().trim().replace(/\s/g, '');
+            if (!clean) return 0;
+            if (clean.includes('.') && clean.includes(',')) {
+                if (clean.indexOf('.') < clean.indexOf(',')) {
+                    clean = clean.replace(/\./g, '').replace(',', '.');
+                } else {
+                    clean = clean.replace(/,/g, '');
+                }
+            } else if (clean.includes(',')) {
+                clean = clean.replace(',', '.');
+            }
+            const parsed = parseFloat(clean);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
         for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
+            const line = lines[i];
+            const cols = line.split(delimiter).map(c => c.trim().replace(/"/g, ''));
+            if (cols.length < 5) continue;
 
-            const cols = line.split(',');
-            if (cols.length < 10) continue;
+            const rawTicket = cols[0];
+            const ticket = parseInt(rawTicket);
+            if (!rawTicket) continue;
 
-            // ticket,opening_time_utc,closing_time_utc,type,lots,original_position_size,symbol,opening_price,closing_price,stop_loss,take_profit,commission_usd,swap_usd,profit_usd...
+            const openTime = this.normalizeDate(cols[1]);
+            if (!openTime) continue;
 
-            const ticket = parseInt(cols[0]);
-            if (isNaN(ticket)) continue;
+            let closeTime: Date | null = null;
+            let type = 'buy';
+            let volume = 0;
+            let symbol = '';
+            let openPrice = 0;
+            let closePrice = 0;
+            let sl = 0;
+            let tp = 0;
+            let commission = 0;
+            let swap = 0;
+            let profit = 0;
 
-            // Dates are in ISO format: 2026-02-17T10:19:47.767000
-            const openTime = new Date(cols[1]);
-            const closeTime = cols[2] ? new Date(cols[2]) : null;
+            const col2Lower = (cols[2] || '').toLowerCase();
+            const isCol2Type = validTypes.some(t => col2Lower.includes(t));
+
+            if (isCol2Type) {
+                // Row has: ticket (0), open_time (1), type (2), lots (3), orig_size (4), symbol (5), open_price (6), close_price (7), sl (8), tp (9), commission (10), swap (11), profit (12)
+                type = col2Lower;
+                volume = parseNum(cols[3]);
+                symbol = cols[5] || '';
+                openPrice = parseNum(cols[6]);
+                closePrice = parseNum(cols[7]);
+                sl = parseNum(cols[8]);
+                tp = parseNum(cols[9]);
+                commission = parseNum(cols[10]);
+                swap = parseNum(cols[11]);
+                profit = parseNum(cols[12]);
+
+                // Check remaining columns for closing time if present
+                for (let c = 13; c < cols.length; c++) {
+                    const candidateDate = this.normalizeDate(cols[c]);
+                    if (candidateDate) {
+                        closeTime = candidateDate;
+                        break;
+                    }
+                }
+                if (!closeTime && openTime) {
+                    closeTime = new Date(openTime.getTime() + 5 * 60 * 1000);
+                }
+            } else {
+                // Standard row with closing_time_utc at col 2:
+                closeTime = cols[2] ? this.normalizeDate(cols[2]) : null;
+                if (!closeTime && openTime) {
+                    closeTime = new Date(openTime.getTime() + 5 * 60 * 1000);
+                }
+                type = (cols[3] || 'buy').toLowerCase();
+                volume = parseNum(cols[4]);
+                symbol = cols[6] || cols[5] || '';
+                openPrice = parseNum(cols[7]);
+                closePrice = parseNum(cols[8]);
+                sl = parseNum(cols[9]);
+                tp = parseNum(cols[10]);
+                commission = parseNum(cols[11]);
+                swap = parseNum(cols[12]);
+                profit = parseNum(cols[13]);
+            }
+
+            const cleanSymbol = symbol ? symbol.replace(/(\.x|\.y|[_\-]ecn|m|pro)$/i, '') : '';
 
             trades.push({
-                ticket: ticket,
+                ticket: !isNaN(ticket) && ticket > 0 ? ticket : rawTicket,
+                contractId: rawTicket,
                 open_time: openTime,
                 close_time: closeTime,
-                type: cols[3].toLowerCase(),
-                volume: parseFloat(cols[4]),
-                symbol: cols[6],
-                open_price: parseFloat(cols[7]),
-                close_price: parseFloat(cols[8]),
-                sl: parseFloat(cols[9]) || 0, // stop_loss is column 9
-                tp: parseFloat(cols[10]) || 0, // take_profit is column 10
-                commission: parseFloat(cols[11]) || 0, // commission_usd
-                swap: parseFloat(cols[12]) || 0, // swap_usd
-                profit: parseFloat(cols[13]) || 0, // profit_usd
+                status: 'CLOSED', // History reports only contain closed trades
+                type: type,
+                volume: volume,
+                symbol: cleanSymbol || symbol,
+                open_price: openPrice,
+                close_price: closePrice,
+                sl: sl,
+                tp: tp,
+                commission: commission,
+                swap: swap,
+                profit: profit,
                 comment: 'Imported via History CSV',
                 magic: 0
             });

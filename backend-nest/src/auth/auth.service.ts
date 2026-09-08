@@ -616,19 +616,27 @@ export class AuthService {
         };
     }
 
-    async getAppToken(userId: string) {
-        let account = await this.accountRepository.findOne({ where: { userId } });
-
+    async getAppToken(userId: string, accountId?: string) {
+        let account: AccountEntity | null = null;
+        if (accountId && accountId !== 'all') {
+            account = await this.accountRepository.findOne({ where: { id: accountId, userId } });
+        }
+        if (!account) {
+            account = await this.accountRepository.findOne({ where: { userId, isArchived: false, isPrimary: true } });
+        }
+        if (!account) {
+            account = await this.accountRepository.findOne({ where: { userId, isArchived: false } });
+        }
         if (!account) {
             account = await this.createDefaultAccount(userId);
         }
 
         if (!account.appToken) {
-            account.appToken = crypto.randomUUID().toUpperCase();
+            account.appToken = crypto.randomUUID().replace(/-/g, '').toUpperCase();
             await this.accountRepository.save(account);
         }
 
-        return { token: account.appToken };
+        return { token: account.appToken, accountId: account.id, accountName: account.name };
     }
 
     async setupTwoFactor(userId: string) {

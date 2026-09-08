@@ -1,18 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { HttpModule } from '@nestjs/axios';
-import { ConfigModule } from '@nestjs/config';
 import { FinnhubController } from './finnhub.controller';
 import { FinnhubService } from './finnhub.service';
-import { EconomicEvent } from './economic-event.entity';
-import { PaymentModule } from '../payment/payment.module';
+import { EconomicCalendarModule } from '../economic-calendar/economic-calendar.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([EconomicEvent]),
-        HttpModule,
-        ConfigModule,
-        PaymentModule
+        EconomicCalendarModule
     ],
     controllers: [FinnhubController],
     providers: [FinnhubService],

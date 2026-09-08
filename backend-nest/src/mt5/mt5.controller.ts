@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, HttpCode, Param, UseGuards, Req, Headers, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, HttpCode, Param, Query, UseGuards, Req, Headers, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { AppTokenGuard } from '../auth/app-token.guard';
@@ -25,8 +25,8 @@ export class Mt5Controller {
     @Get('import-history')
     @UseGuards(JwtAuthGuard, PlanGuard)
     @RequirePlan(PlanTier.BASIC)
-    async getImportHistory(@Req() req) {
-        return this.mt5Service.getImportHistory(req.user.id);
+    async getImportHistory(@Req() req, @Query('accountId') accountId?: string) {
+        return this.mt5Service.getImportHistory(req.user.id, accountId);
     }
 
     @Delete('import-history/:id/revert')

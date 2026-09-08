@@ -8,6 +8,7 @@ import { AccountEntity } from '../account/account.entity';
 
 import { TechnicalJournal } from './technical-journal.entity';
 import { MentalLog } from './mental-log.entity';
+import { BacktestSession } from './backtest-session.entity';
 
 import { UserEntity } from '../users/user.entity';
 import { EmailModule } from '../email/email.module';
@@ -18,7 +19,7 @@ import { PaymentModule } from '../payment/payment.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([TradeEntity, AccountEntity, MentalLog, TechnicalJournal, UserEntity]),
+        TypeOrmModule.forFeature([TradeEntity, AccountEntity, MentalLog, TechnicalJournal, BacktestSession, UserEntity]),
         EmailModule,
         NotificationsModule,
         PaymentModule

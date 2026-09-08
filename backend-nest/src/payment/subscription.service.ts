@@ -36,6 +36,7 @@ export class SubscriptionService implements OnModuleInit {
         private smsService: SmsService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         @InjectQueue('subscription-queue') private subscriptionQueue: Queue,
+        @InjectQueue('email-queue') private emailQueue: Queue,
     ) { }
 
     async onModuleInit() {
@@ -852,5 +853,157 @@ export class SubscriptionService implements OnModuleInit {
         // Update database user record
         await this.userRepo.update(userId, { lastWarningShown: today });
         return { success: true };
+    }
+
+    // --- TRIAL CAMPAIGN SYSTEM ---
+
+    async getTrialCampaignStatus() {
+        const proPlan = await this.planConfigRepo.findOne({
+            where: [{ tier: 'PRO' }, { tier: 'PREMIUM' }]
+        });
+
+        const totalTrialsGranted = await this.userRepo.count({
+            where: { hasUsedTrial: true }
+        });
+
+        return {
+            active: Boolean(proPlan?.trialEnabled),
+            trialDays: proPlan?.trialDays || 30,
+            tier: proPlan?.tier || 'PRO',
+            totalTrialsGranted,
+            updatedAt: proPlan?.updatedAt
+        };
+    }
+
+    async toggleTrialCampaign(enabled: boolean, days: number = 30) {
+        let proPlan = await this.planConfigRepo.findOne({
+            where: [{ tier: 'PRO' }, { tier: 'PREMIUM' }]
+        });
+
+        if (!proPlan) {
+            proPlan = this.planConfigRepo.create({
+                tier: 'PRO',
+                description: 'Para traders profissionais',
+                features: ['Tudo do Básico', 'Análises Avançadas', 'Sem Limites', 'Suporte VIP'],
+                monthlyPrice: 1,
+                annualDiscountPercent: 20,
+                trialEnabled: enabled,
+                trialDays: days,
+                trialPrice: 0,
+                isActive: true
+            });
+        } else {
+            proPlan.trialEnabled = enabled;
+            if (days !== undefined) {
+                proPlan.trialDays = Number(days);
+            }
+        }
+
+        await this.planConfigRepo.save(proPlan);
+        this.logger.log(`[SubscriptionService] Trial Campaign updated: active=${enabled}, days=${proPlan.trialDays}`);
+
+        return this.getTrialCampaignStatus();
+    }
+
+    async claimOrCheckTrialForUser(userId: string): Promise<{
+        trialGranted: boolean;
+        trialDays?: number;
+        expiryDate?: Date;
+        hasUsedTrial: boolean;
+        reason?: string;
+    }> {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) {
+            return { trialGranted: false, hasUsedTrial: false, reason: 'user_not_found' };
+        }
+
+        if (user.hasUsedTrial) {
+            return { trialGranted: false, hasUsedTrial: true, reason: 'trial_already_used' };
+        }
+
+        // Check if trial campaign is currently active
+        const campaign = await this.getTrialCampaignStatus();
+        if (!campaign.active) {
+            return { trialGranted: false, hasUsedTrial: false, reason: 'campaign_inactive' };
+        }
+
+        // Check if user already has an active subscription
+        const now = new Date();
+        const activeSub = await this.subscriptionRepo.findOne({
+            where: { userId, status: SubscriptionStatus.ACTIVE },
+            relations: ['planConfig']
+        });
+
+        if (activeSub && activeSub.currentPeriodEnd && activeSub.currentPeriodEnd > now) {
+            return { trialGranted: false, hasUsedTrial: false, reason: 'has_active_subscription' };
+        }
+
+        // Find PRO plan config to attach
+        const proPlan = await this.planConfigRepo.findOne({
+            where: [{ tier: 'PRO' }, { tier: 'PREMIUM' }]
+        });
+
+        if (!proPlan) {
+            this.logger.warn(`[SubscriptionService] PRO plan config not found to grant trial to user ${userId}`);
+            return { trialGranted: false, hasUsedTrial: false, reason: 'pro_plan_missing' };
+        }
+
+        const trialDays = campaign.trialDays || 30;
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + trialDays);
+
+        // Create trial subscription
+        const sub = this.subscriptionRepo.create({
+            userId: user.id,
+            planConfigId: proPlan.id,
+            planConfig: proPlan,
+            status: SubscriptionStatus.ACTIVE,
+            cycle: SubscriptionCycle.MONTHLY,
+            paymentMethod: 'TRIAL',
+            paymentReference: `TRIAL_${trialDays}D_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            currentPeriodEnd: expiryDate,
+        });
+
+        await this.subscriptionRepo.save(sub);
+
+        // Mark user as having used the trial
+        user.hasUsedTrial = true;
+        user.trialUsedAt = new Date();
+        await this.userRepo.save(user);
+
+        // Invalidate cache immediately so PlanPermissionService reflects PREMIUM tier instantly
+        await this.cacheManager.del(`user_plan_tier:${userId}`).catch(() => {});
+        await this.cacheManager.del(`user_subscription_status:${userId}`).catch(() => {});
+
+        this.logger.log(`🎉 [SubscriptionService] Trial granted to user ${user.email} for ${trialDays} days (until ${expiryDate.toISOString()})`);
+
+        // Send confirmation email via queue or direct
+        const formattedDate = expiryDate.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dashboardUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/dashboard`;
+
+        try {
+            await this.emailQueue.add('trial-welcome', {
+                email: user.email,
+                userName: user.name || user.username || 'Trader',
+                days: trialDays,
+                expiryDate: formattedDate,
+                dashboardUrl
+            }, { removeOnComplete: true });
+        } catch (err) {
+            this.logger.warn(`Could not enqueue trial-welcome email: ${err.message}. Sending direct fallback.`);
+            this.emailService.sendTemplatedEmail(user.email, 'TRIAL_WELCOME', {
+                userName: user.name || user.username || 'Trader',
+                days: trialDays,
+                expiryDate: formattedDate,
+                dashboardUrl
+            }).catch(e => this.logger.error(`Direct email fallback failed: ${e.message}`));
+        }
+
+        return {
+            trialGranted: true,
+            trialDays,
+            expiryDate,
+            hasUsedTrial: true
+        };
     }
 }

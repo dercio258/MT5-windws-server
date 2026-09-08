@@ -7,6 +7,9 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { GenericExceptionFilter } from './common/filters/generic-exception.filter';
 import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import { join } from 'path';
+import * as fs from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -21,6 +24,31 @@ async function bootstrap() {
       fileSize: 52428800, // 50MB file size limit
     }
   });
+
+  // Register uploads static serving
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  await app.register(fastifyStatic, {
+    root: uploadsDir,
+    prefix: '/uploads/',
+    decorateReply: false
+  });
+
+  // Register Frontend static files (client/dist) with proper MIME types & SPA fallback
+  const clientDist = fs.existsSync(join(process.cwd(), '..', 'client', 'dist'))
+    ? join(process.cwd(), '..', 'client', 'dist')
+    : join(__dirname, '..', '..', 'client', 'dist');
+
+  if (fs.existsSync(clientDist)) {
+    await app.register(fastifyStatic, {
+      root: clientDist,
+      prefix: '/',
+      wildcard: true,
+      decorateReply: false
+    });
+  }
 
   // Enable CORS
   app.enableCors({

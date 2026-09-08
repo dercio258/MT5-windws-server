@@ -134,24 +134,157 @@ export class ClickHouseService implements OnModuleInit {
         }
     }
 
-    private mapTrade(t: any) {
+    async updateTradeMetadata(tradeId: string, metadata: any) {
+        try {
+            const updates: string[] = [];
+            const params: Record<string, any> = { id: tradeId };
+            if (metadata.session !== undefined) {
+                updates.push('session = {session:Nullable(String)}');
+                params.session = metadata.session;
+            }
+            if (metadata.mood !== undefined) {
+                updates.push('mood = {mood:Nullable(String)}');
+                params.mood = metadata.mood;
+            }
+            if (metadata.setup !== undefined) {
+                updates.push('setup = {setup:Nullable(String)}');
+                params.setup = metadata.setup;
+            }
+            if (metadata.lesson !== undefined) {
+                updates.push('lesson = {lesson:Nullable(String)}');
+                params.lesson = metadata.lesson;
+            }
+            if (metadata.rating !== undefined) {
+                updates.push('rating = {rating:Nullable(UInt8)}');
+                params.rating = metadata.rating;
+            }
+            if (updates.length > 0) {
+                updates.push('updatedAt = now()');
+                await this.client.command({
+                    query: `ALTER TABLE trades UPDATE ${updates.join(', ')} WHERE id = {id:String}`,
+                    query_params: params
+                });
+            }
+        } catch (e) {
+            this.logger.warn(`ClickHouse updateTradeMetadata error: ${e.message}`);
+        }
+    }
+
+    async deleteTradesByImportLogId(logId: number) {
+        if (!logId) return;
+        try {
+            this.logger.log(`Deleting trades in ClickHouse with importLogId = ${logId}`);
+            await this.client.command({
+                query: `ALTER TABLE trades DELETE WHERE importLogId = {logId:UInt32}`,
+                query_params: { logId: Number(logId) }
+            });
+            this.logger.log(`Successfully requested deletion for importLogId ${logId} in ClickHouse`);
+        } catch (e) {
+            this.logger.error(`Failed to delete trades for importLogId ${logId} in ClickHouse: ${e.message}`);
+        }
+    }
+
+    async deleteTradesByIds(ids: string[]) {
+        if (!ids || ids.length === 0) return;
+        try {
+            this.logger.log(`Deleting ${ids.length} trades in ClickHouse by IDs`);
+            const chunkSize = 500;
+            for (let i = 0; i < ids.length; i += chunkSize) {
+                const chunk = ids.slice(i, i + chunkSize);
+                await this.client.command({
+                    query: `ALTER TABLE trades DELETE WHERE id IN ({ids:Array(String)})`,
+                    query_params: { ids: chunk }
+                });
+            }
+        } catch (e) {
+            this.logger.error(`Failed to delete trades by IDs in ClickHouse: ${e.message}`);
+        }
+    }
+
+    async deleteTradesByAccountId(accountId: string) {
+        if (!accountId) return;
+        try {
+            this.logger.log(`Deleting trades in ClickHouse for accountId = ${accountId}`);
+            await this.client.command({
+                query: `ALTER TABLE trades DELETE WHERE accountId = {accountId:String}`,
+                query_params: { accountId: String(accountId) }
+            });
+        } catch (e) {
+            this.logger.error(`Failed to delete trades for accountId ${accountId} in ClickHouse: ${e.message}`);
+        }
+    }
+
+    async syncAccountTrades(accountIds: string[], validTrades: any[]) {
+        if (!accountIds || accountIds.length === 0) return;
+        try {
+            this.logger.log(`Syncing/healing ClickHouse trades for accounts: ${accountIds.join(', ')}`);
+            await this.client.command({
+                query: `ALTER TABLE trades DELETE WHERE accountId IN ({accountIds:Array(String)})`,
+                query_params: { accountIds }
+            });
+            if (validTrades && validTrades.length > 0) {
+                // Short wait to ensure partition mutation order
+                await new Promise(res => setTimeout(res, 200));
+                await this.saveTrades(validTrades);
+            }
+        } catch (e) {
+            this.logger.error(`Failed to sync account trades in ClickHouse: ${e.message}`);
+        }
+    }
+
+    async purgeOrphanTradesNotInPg(validPgTradeIds: string[]) {
+        try {
+            const chRes = await this.client.query({
+                query: `SELECT id FROM trades`,
+                format: 'JSONEachRow'
+            });
+            const chTrades = await chRes.json<{ id: string }>();
+            const validSet = new Set(validPgTradeIds);
+            const orphanIds = chTrades.map(t => t.id).filter(id => !validSet.has(id));
+            if (orphanIds.length > 0) {
+                this.logger.log(`Found ${orphanIds.length} orphan trades in ClickHouse. Purging...`);
+                await this.deleteTradesByIds(orphanIds);
+                this.logger.log(`Purged ${orphanIds.length} orphan trades from ClickHouse successfully.`);
+            }
+            return orphanIds.length;
+        } catch (e) {
+            this.logger.error(`Failed to purge orphan trades from ClickHouse: ${e.message}`);
+            return 0;
+        }
+    }
+
+    async optimizeTradesTable() {
+        try {
+            await this.client.command({ query: 'OPTIMIZE TABLE trades FINAL' });
+        } catch (e) {
+            this.logger.warn(`ClickHouse OPTIMIZE warning: ${e.message}`);
+        }
+    }
+
+    public mapTrade(t: any) {
+        const rawTicket = t.ticket || t.contractId || t.contract_id || t.id || '';
+        const rawAccountId = t.accountId || t.account_id || t.account?.id || '';
+        const rawOpenTime = t.openTime || t.open_time || new Date();
+        const rawCloseTime = t.closeTime || t.close_time;
+        const rawUpdatedAt = t.updatedAt || t.updated_at || new Date();
+
         return {
             id: String(t.id),
-            accountId: String(t.accountId || t.account?.id || ''),
-            ticket: String(t.ticket),
-            contractId: t.contractId ? String(t.contractId) : null,
-            symbol: String(t.symbol),
-            type: String(t.type),
+            accountId: String(rawAccountId),
+            ticket: String(rawTicket),
+            contractId: t.contractId || t.contract_id ? String(t.contractId || t.contract_id) : null,
+            symbol: String(t.symbol || ''),
+            type: String(t.type || ''),
             volume: Number(t.volume || 0),
-            openPrice: Number(t.openPrice || 0),
-            closePrice: Number(t.closePrice || 0),
+            openPrice: Number(t.openPrice ?? t.open_price ?? 0),
+            closePrice: Number(t.closePrice ?? t.close_price ?? 0),
             profit: Number(t.profit || 0),
             sl: t.sl !== null && t.sl !== undefined ? Number(t.sl) : null,
             tp: t.tp !== null && t.tp !== undefined ? Number(t.tp) : null,
             commission: Number(t.commission || 0),
             swap: Number(t.swap || 0),
-            openTime: new Date(t.openTime).toISOString().replace('T', ' ').replace('Z', ''),
-            closeTime: t.closeTime ? new Date(t.closeTime).toISOString().replace('T', ' ').replace('Z', '') : null,
+            openTime: new Date(rawOpenTime).toISOString().replace('T', ' ').replace('Z', '').split('.')[0],
+            closeTime: rawCloseTime ? new Date(rawCloseTime).toISOString().replace('T', ' ').replace('Z', '').split('.')[0] : null,
             status: String(t.status || 'CLOSED'),
             magic: t.magic !== null && t.magic !== undefined ? Number(t.magic) : null,
             comment: t.comment ? String(t.comment) : null,
@@ -161,9 +294,9 @@ export class ClickHouseService implements OnModuleInit {
             setup: t.setup ? String(t.setup) : null,
             lesson: t.lesson ? String(t.lesson) : null,
             tags: Array.isArray(t.tags) ? t.tags.map(String) : [],
-            dataQuality: String(t.dataQuality || 'UNKNOWN'),
-            importLogId: t.importLogId !== null && t.importLogId !== undefined ? Number(t.importLogId) : null,
-            updatedAt: new Date(t.updatedAt || new Date()).toISOString().replace('T', ' ').replace('Z', '')
+            dataQuality: String(t.dataQuality || t.data_quality || 'UNKNOWN'),
+            importLogId: t.importLogId !== null && t.importLogId !== undefined ? Number(t.importLogId || t.import_log_id) : null,
+            updatedAt: new Date(rawUpdatedAt).toISOString().replace('T', ' ').replace('Z', '').split('.')[0]
         };
     }
 }

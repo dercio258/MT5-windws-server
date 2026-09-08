@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Put, Res, Logger } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Put, Res, Logger, Query } from '@nestjs/common';
 import { FastifyReply } from 'fastify';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
@@ -8,6 +8,7 @@ import { GoogleOauthGuard } from './google-oauth.guard';
 import { GithubOauthGuard } from './github-oauth.guard';
 import { Throttle } from '@nestjs/throttler';
 import { PlanPermissionService } from '../payment/plan-permission.service';
+import { SubscriptionService } from '../payment/subscription.service';
 import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
@@ -18,6 +19,7 @@ export class AuthController {
         private readonly usersService: UsersService,
         private readonly accountService: AccountService,
         private readonly planPermissionService: PlanPermissionService,
+        private readonly subscriptionService: SubscriptionService,
         private readonly configService: ConfigService
     ) { }
 
@@ -113,6 +115,9 @@ export class AuthController {
                 isConnected = false;
             }
 
+            // Check and automatically grant trial if eligible and campaign is active
+            const trialResult = await this.subscriptionService.claimOrCheckTrialForUser(user.id);
+
             const planTier = await this.planPermissionService.getUserPlan(user.id);
             const subscription = await this.planPermissionService.getFullUserSubscription(user.id);
 
@@ -132,6 +137,10 @@ export class AuthController {
                 token: user.apiToken,
                 is_connected: isConnected,
                 tier: planTier,
+                hasUsedTrial: user.hasUsedTrial || trialResult.hasUsedTrial,
+                trialUsedAt: user.trialUsedAt,
+                trialJustGranted: trialResult.trialGranted,
+                trialDays: trialResult.trialDays,
                 subscription: subscription ? {
                     id: subscription.id,
                     status: subscription.status,
@@ -163,8 +172,9 @@ export class AuthController {
 
     @UseGuards(AuthGuard('jwt'))
     @Get('app-token')
-    async getAppToken(@Request() req) {
-        return this.authService.getAppToken(req.user.id);
+    async getAppToken(@Request() req, @Query('accountId') queryAccountId?: string) {
+        const accountId = queryAccountId || (req.headers['x-account-id'] as string) || undefined;
+        return this.authService.getAppToken(req.user.id, accountId);
     }
 
     @Post('verify-2fa')

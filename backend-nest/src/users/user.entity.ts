@@ -93,4 +93,10 @@ export class UserEntity {
 
     @Column({ name: 'last_warning_shown', type: 'timestamp', nullable: true })
     lastWarningShown: Date;
+
+    @Column({ name: 'has_used_trial', default: false })
+    hasUsedTrial: boolean;
+
+    @Column({ name: 'trial_used_at', type: 'timestamp', nullable: true })
+    trialUsedAt: Date;
 }

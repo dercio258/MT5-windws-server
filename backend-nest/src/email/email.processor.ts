@@ -113,4 +113,21 @@ export class EmailProcessor {
             this.logger.warn(`⚠️ Email Send Failed: ${error.message}`);
         }
     }
+
+    @Process('trial-welcome')
+    async handleTrialWelcome(job: Job) {
+        const { email, userName, days, expiryDate, dashboardUrl } = job.data;
+        try {
+            this.logger.log(`📧 Sending Trial Welcome Email to ${email}...`);
+            await this.emailService.sendTemplatedEmail(email, 'TRIAL_WELCOME', {
+                userName,
+                days,
+                expiryDate,
+                dashboardUrl
+            });
+            this.logger.log(`✅ Trial Welcome Email sent to ${email}`);
+        } catch (error: any) {
+            this.logger.warn(`⚠️ Email Send Failed: ${error.message}`);
+        }
+    }
 }
