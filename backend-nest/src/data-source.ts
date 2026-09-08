@@ -1,9 +1,11 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
+import * as path from 'path';
 
-config(); // Load .env file
-
-config(); // Load .env file
+// Prioritize backend-nest/.env and fallback to cwd
+config({ path: path.resolve(__dirname, '../.env') });
+config({ path: path.resolve(process.cwd(), '.env') });
+config({ path: path.resolve(process.cwd(), 'backend-nest/.env') });
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
@@ -15,6 +17,6 @@ export const AppDataSource = new DataSource({
     synchronize: false,
     logging: false,
     entities: [__dirname + '/**/*.entity{.ts,.js}'],
-    migrations: ['src/migrations/*.ts'],
+    migrations: [__dirname + '/migrations/*{.ts,.js}'],
     subscribers: [],
 });

@@ -1,13 +1,33 @@
-require('dotenv').config({ path: 'e:/TRADING COSSA/backend-nest/.env' });
+const path = require('path');
+// Prioritize backend-nest/.env, with fallbacks to current directory and parent directory
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
+require('dotenv').config({ path: path.resolve(process.cwd(), 'backend-nest/.env') });
+
 const { Client } = require('pg');
 
 async function migrate() {
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASS;
+  const database = process.env.DB_NAME;
+
+  if (!user || !password || !database) {
+    console.error('❌ Missing database credentials in environment variables (DB_USER, DB_PASS, DB_NAME).');
+    console.error('Resolved values:', {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || '5432',
+      user: user || '<undefined>',
+      database: database || '<undefined>'
+    });
+    process.exit(1);
+  }
+
   const client = new Client({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME
+    user,
+    password,
+    database
   });
   await client.connect();
 
