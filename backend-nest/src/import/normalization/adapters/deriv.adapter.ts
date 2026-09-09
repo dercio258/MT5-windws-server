@@ -1,12 +1,40 @@
 import { ITradeAdapter } from '../trade-adapter.interface';
 import { NormalizedTradeDto } from '../normalized-trade.dto';
 
+export const DERIV_SYMBOL_MAP: Record<string, string> = {
+    '1HZ100V': 'Volatility 100 (1s) Index',
+    '1HZ10V': 'Volatility 10 (1s) Index',
+    '1HZ25V': 'Volatility 25 (1s) Index',
+    '1HZ50V': 'Volatility 50 (1s) Index',
+    '1HZ75V': 'Volatility 75 (1s) Index',
+    '1HZ30V': 'Volatility 30 (1s) Index',
+    '1HZ150V': 'Volatility 150 (1s) Index',
+    '1HZ250V': 'Volatility 250 (1s) Index',
+    'R_10': 'Volatility 10 Index',
+    'R_25': 'Volatility 25 Index',
+    'R_50': 'Volatility 50 Index',
+    'R_75': 'Volatility 75 Index',
+    'R_100': 'Volatility 100 Index',
+    'BOOM300': 'Boom 300 Index',
+    'BOOM500': 'Boom 500 Index',
+    'BOOM1000': 'Boom 1000 Index',
+    'CRASH300': 'Crash 300 Index',
+    'CRASH500': 'Crash 500 Index',
+    'CRASH1000': 'Crash 1000 Index',
+    'STEP': 'Step Index',
+    'JUMP10': 'Jump 10 Index',
+    'JUMP25': 'Jump 25 Index',
+    'JUMP50': 'Jump 50 Index',
+    'JUMP75': 'Jump 75 Index',
+    'JUMP100': 'Jump 100 Index'
+};
+
 export class DerivAdapter implements ITradeAdapter {
 
     normalize(rawData: any): NormalizedTradeDto | null {
         if (!rawData) return null;
 
-        // Deriv payloads can be from 'proposal_open_contract' or 'transaction' (statement)
+        // Deriv payloads can be from 'proposal_open_contract' or 'transaction' (statement / profit_table)
         const contractDetails = rawData;
         const contractId = (contractDetails.contract_id || contractDetails.transaction_id)?.toString();
 
@@ -17,16 +45,21 @@ export class DerivAdapter implements ITradeAdapter {
 
         if (!openTime) return null;
 
-        const closeTime = this.safeDate(contractDetails.sell_time);
+        const closeTime = this.safeDate(contractDetails.sell_time || contractDetails.date_expiry);
         const buyAmount = Math.abs(parseFloat(contractDetails.buy_price || contractDetails.amount || 0));
+        const sellPrice = parseFloat(contractDetails.sell_price || 0);
 
         let netPnl = 0;
-        let totalPayout = parseFloat(contractDetails.payout || contractDetails.sell_price || 0);
+        const rawStatus = (contractDetails.status || '').toLowerCase();
 
-        if (contractDetails.profit !== undefined) {
+        if (contractDetails.profit !== undefined && contractDetails.profit !== null) {
             netPnl = parseFloat(contractDetails.profit);
+        } else if (rawStatus === 'won') {
+            netPnl = sellPrice > 0 ? (sellPrice - buyAmount) : (parseFloat(contractDetails.payout || 0) - buyAmount);
+        } else if (rawStatus === 'lost') {
+            netPnl = -buyAmount;
         } else if (contractDetails.is_sold === 1 || contractDetails.action_type === 'sell') {
-            netPnl = totalPayout - buyAmount;
+            netPnl = sellPrice - buyAmount;
         } else {
             // Estimate floating P&L using current bid
             const currentPrice = parseFloat(contractDetails.bid_price) || 0;
@@ -35,23 +68,33 @@ export class DerivAdapter implements ITradeAdapter {
             }
         }
 
+        // Spot prices (NEVER use stake/buy_price or payout/sell_price as spot levels)
         const entryPrice = parseFloat(
             contractDetails.entry_spot ||
             contractDetails.entry_tick ||
-            contractDetails.barrier ||
-            contractDetails.buy_price
+            contractDetails.barrier
         ) || 0;
 
         const exitPrice = parseFloat(
             contractDetails.exit_spot ||
             contractDetails.exit_tick ||
             contractDetails.sell_spot ||
-            contractDetails.sell_price
+            contractDetails.current_spot
         ) || 0;
 
-        const isClosed = contractDetails.is_sold === 1 || contractDetails.status?.toUpperCase() === 'CLOSED' || contractDetails.action_type === 'sell';
+        const isClosed = contractDetails.is_sold === 1 ||
+            contractDetails.is_expired === 1 ||
+            rawStatus === 'closed' ||
+            rawStatus === 'won' ||
+            rawStatus === 'lost' ||
+            contractDetails.action_type === 'sell';
 
-        // Check for Deriv quality issues (e.g., missing sell date on a closed trade)
+        // Contract type: Sell for Put/Fall/Lower/MultDown, Buy for Call/Rise/Higher/MultUp
+        const typeStr = (contractDetails.contract_type || contractDetails.shortcode || '').toUpperCase();
+        const isSell = typeStr.includes('PUT') || typeStr.includes('FALL') || typeStr.includes('LOWER') || typeStr.includes('MULTDOWN');
+        const tradeType = isSell ? 'Sell' : 'Buy';
+
+        // Check for Deriv quality issues
         const flags: any = {};
         if (isClosed && !closeTime) flags.missing_close_time = true;
 
@@ -63,7 +106,7 @@ export class DerivAdapter implements ITradeAdapter {
             ticket: contractId, // Use contractId as primary ticket for Deriv
             contractId: contractId,
             symbol: symbol,
-            type: (contractDetails.contract_type?.includes('PUT') || contractDetails.shortcode?.includes('PUT')) ? 'Sell' : 'Buy',
+            type: tradeType,
             volume: buyAmount, // Treat the stake/buy price as volume for Deriv
             openPrice: entryPrice,
             closePrice: exitPrice,
@@ -84,8 +127,11 @@ export class DerivAdapter implements ITradeAdapter {
     }
 
     private extractSymbol(t: any): string {
-        if (t.underlying) return t.underlying.toUpperCase();
-        if (t.underlying_symbol) return t.underlying_symbol.toUpperCase();
+        const rawSymbol = t.underlying_symbol || t.underlying;
+        if (rawSymbol) {
+            const upper = rawSymbol.toUpperCase();
+            return DERIV_SYMBOL_MAP[upper] || upper;
+        }
 
         const shortcode = t.shortcode || '';
         if (shortcode) {
@@ -100,8 +146,14 @@ export class DerivAdapter implements ITradeAdapter {
             if (cleanCode.startsWith('FRX')) cleanCode = cleanCode.substring(3);
             const parts = cleanCode.split('_');
             const symbol = parts[0];
-            if (symbol === 'R' && parts.length > 1 && !isNaN(parseInt(parts[1]))) return `R_${parts[1]}`;
-            if (symbol) return symbol.toUpperCase();
+            if (symbol === 'R' && parts.length > 1 && !isNaN(parseInt(parts[1]))) {
+                const code = `R_${parts[1]}`;
+                return DERIV_SYMBOL_MAP[code] || code;
+            }
+            if (symbol) {
+                const upper = symbol.toUpperCase();
+                return DERIV_SYMBOL_MAP[upper] || upper;
+            }
         }
 
         if (t.display_name) return t.display_name;
@@ -109,7 +161,7 @@ export class DerivAdapter implements ITradeAdapter {
         // Fallback to parsing longcode
         const longcode = t.longcode || '';
         if (longcode) {
-            const match = longcode.match(/if (.*?) is/i);
+            const match = longcode.match(/if (.*?) (is|after|touches)/i);
             if (match && match[1]) return match[1].trim();
         }
 

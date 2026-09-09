@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, NotFoundException } from '@nestjs/common';
 import { Subscription } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import axios from 'axios';
 import { DerivAuthEntity } from './entities/deriv-auth.entity';
 import { DerivTransactionEntity } from './entities/deriv-transaction.entity';
 import { DerivClient } from './deriv.client';
@@ -10,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { Mt5Service } from '../mt5/mt5.service';
 import { ImportMethod } from '../mt5/import-log.entity';
 import { TradeEntity } from '../mt5/trade.entity';
-import { AccountEntity } from '../account/account.entity';
+import { AccountEntity, AccountType } from '../account/account.entity';
 import { NormalizationService } from '../import/normalization/normalization.service';
 
 @Injectable()
@@ -61,6 +62,61 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
         this.clients.clear();
     }
 
+    private getEncryptionKey(): string {
+        const key = this.configService.get<string>('DERIV_ENCRYPTION_KEY');
+        if (key && key.trim().length > 0) return key.trim();
+
+        const jwtSecret = this.configService.get<string>('JWT_SECRET');
+        if (jwtSecret && jwtSecret.trim().length > 0) {
+            this.logger.warn('DERIV_ENCRYPTION_KEY not set; using derived key from JWT_SECRET');
+            return `deriv-sec-${jwtSecret.trim()}`;
+        }
+
+        return 'cossa-trading-deriv-default-secret-key-32b';
+    }
+
+    private async discoverAccountsViaRest(token: string): Promise<any[] | null> {
+        const appId = this.configService.get<string>('DERIV_APP_ID') || '1089';
+        try {
+            const res = await axios.get('https://api.derivws.com/trading/v1/options/accounts', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Deriv-App-ID': appId,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 8000
+            });
+            if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+                this.logger.log(`Discovered ${res.data.data.length} accounts via modern Deriv REST API`);
+                return res.data.data;
+            }
+        } catch (err) {
+            this.logger.debug(`Modern REST account discovery not available: ${err.message}. Using standard WS auth.`);
+        }
+        return null;
+    }
+
+    private async getOtpWebSocketUrl(token: string, accountId: string): Promise<string | null> {
+        const appId = this.configService.get<string>('DERIV_APP_ID') || '1089';
+        try {
+            const res = await axios.post(`https://api.derivws.com/trading/v1/options/accounts/${accountId}/otp`, {}, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Deriv-App-ID': appId,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 8000
+            });
+            if (res.data?.data?.url) {
+                this.logger.log(`Obtained pre-authenticated OTP WebSocket URL for account ${accountId}`);
+                return res.data.data.url;
+            }
+        } catch (err) {
+            this.logger.debug(`OTP WebSocket URL request not available for ${accountId}: ${err.message}`);
+        }
+        return null;
+    }
+
     async connect(userId: string, token: string) {
         // Disconnect existing client for this user if any
         if (this.clients.has(userId)) {
@@ -70,22 +126,48 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
         }
 
         const client = new DerivClient();
-        await client.connect();
+
+        // 1. Try modern REST discovery per developers.deriv.com/llms.txt
+        const restAccounts = await this.discoverAccountsViaRest(token);
+        let otpUrl: string | null = null;
+        let selectedRestAccount: any = null;
+
+        if (restAccounts && restAccounts.length > 0) {
+            selectedRestAccount = restAccounts.find(a => a.account_type === 'real' && a.status === 'active') || restAccounts[0];
+            if (selectedRestAccount?.account_id) {
+                otpUrl = await this.getOtpWebSocketUrl(token, selectedRestAccount.account_id);
+            }
+        }
 
         try {
-            const authResponse: any = await client.request({ authorize: token }, 'authorize');
-            client.setAuthorized(true);
-            const accountData = authResponse.authorize;
+            let accountData: any = null;
 
-            const encryptionKey = this.configService.get<string>('DERIV_ENCRYPTION_KEY');
-            if (!encryptionKey) throw new Error('DERIV_ENCRYPTION_KEY not set');
+            if (otpUrl && selectedRestAccount) {
+                // Connect via pre-authenticated OTP gateway URL
+                await client.connect(otpUrl);
+                accountData = {
+                    loginid: selectedRestAccount.account_id,
+                    currency: selectedRestAccount.currency,
+                    balance: selectedRestAccount.balance,
+                    is_virtual: selectedRestAccount.account_type === 'demo' ? 1 : 0
+                };
+            } else {
+                // Standard WebSocket authorize handshake
+                await client.connect();
+                const authResponse: any = await client.request({ authorize: token }, 'authorize');
+                client.setAuthorized(true);
+                accountData = authResponse.authorize;
+            }
 
+            const encryptionKey = this.getEncryptionKey();
             const encryptedToken = CryptoUtil.encrypt(token, encryptionKey);
 
             let auth = await this.derivAuthRepo.findOne({ where: { userId, accountId: accountData.loginid } });
             if (auth) {
                 auth.encryptedToken = encryptedToken;
                 auth.isActive = true;
+                auth.currency = accountData.currency;
+                auth.metadata = accountData;
             } else {
                 auth = this.derivAuthRepo.create({
                     userId,
@@ -97,16 +179,29 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                 });
             }
 
+            const platformAccount = await this.ensureAccountExists(
+                userId,
+                accountData.loginid,
+                accountData.currency,
+                parseFloat(accountData.balance) || 0,
+                accountData.is_virtual === 1
+            );
+
+            auth.accountEntityId = platformAccount.id;
             await this.derivAuthRepo.save(auth);
 
-            const platformAccount = await this.ensureAccountExists(userId, accountData.loginid, accountData.currency);
             this.accountIds.set(userId, platformAccount.id);
-
             this.clients.set(userId, client);
             this.setupSubscriptions(userId, client);
             this.syncHistory(userId, client);
 
-            return { success: true, account: accountData.loginid };
+            return { 
+                success: true, 
+                account: accountData.loginid,
+                currency: accountData.currency,
+                balance: parseFloat(accountData.balance) || 0,
+                accountEntityId: platformAccount.id
+            };
         } catch (e) {
             client.disconnect();
             throw e;
@@ -121,18 +216,40 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
             this.accountIds.delete(auth.userId);
         }
 
-        const encryptionKey = this.configService.get<string>('DERIV_ENCRYPTION_KEY');
+        const encryptionKey = this.getEncryptionKey();
         const token = CryptoUtil.decrypt(auth.encryptedToken, encryptionKey);
 
         const client = new DerivClient();
-        await client.connect();
+
+        // Try OTP URL if available
+        const otpUrl = await this.getOtpWebSocketUrl(token, auth.accountId);
 
         try {
-            await client.request({ authorize: token }, 'authorize', 45000); // Increased timeout for auth
-            client.setAuthorized(true);
+            let accountData: any = auth.metadata || {};
 
-            await this.ensureAccountExists(auth.userId, auth.accountId, auth.currency);
+            if (otpUrl) {
+                await client.connect(otpUrl);
+            } else {
+                await client.connect();
+                const authRes: any = await client.request({ authorize: token }, 'authorize', 45000);
+                client.setAuthorized(true);
+                accountData = authRes?.authorize || auth.metadata || {};
+            }
 
+            const platformAccount = await this.ensureAccountExists(
+                auth.userId,
+                auth.accountId,
+                auth.currency || accountData.currency,
+                parseFloat(accountData.balance) || 0,
+                accountData.is_virtual === 1
+            );
+
+            if (auth.accountEntityId !== platformAccount.id) {
+                auth.accountEntityId = platformAccount.id;
+                await this.derivAuthRepo.update({ id: auth.id }, { accountEntityId: platformAccount.id });
+            }
+
+            this.accountIds.set(auth.userId, platformAccount.id);
             this.clients.set(auth.userId, client);
             this.setupSubscriptions(auth.userId, client);
             this.syncHistory(auth.userId, client);
@@ -159,8 +276,11 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
             if (isConnected) {
                 this.logger.log(`Deriv client reconnected for user ${auth.userId}. Re-authorizing...`);
                 try {
-                    await client.request({ authorize: token }, 'authorize', 45000);
-                    client.setAuthorized(true);
+                    const refreshedOtpUrl = await this.getOtpWebSocketUrl(token, auth.accountId);
+                    if (!refreshedOtpUrl) {
+                        await client.request({ authorize: token }, 'authorize', 45000);
+                        client.setAuthorized(true);
+                    }
                     this.setupSubscriptions(auth.userId, client);
                 } catch (err) {
                     this.logger.error(`Re-authorization failed for user ${auth.userId}: ${err.message}`);
@@ -169,15 +289,29 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
         });
     }
 
-    private async ensureAccountExists(userId: string, platformId: string, currency: string) {
-        let account = await this.accountRepo.findOne({ where: { mt5Id: platformId } });
+    private async ensureAccountExists(
+        userId: string, 
+        platformId: string, 
+        currency: string,
+        initialBalance: number = 0,
+        isVirtual: boolean = false
+    ) {
+        let account = await this.accountRepo.findOne({ where: { userId, mt5Id: platformId } });
+        const accountType = isVirtual ? AccountType.DEMO : AccountType.LIVE;
+        const accountName = `Deriv (${platformId})`;
+
         if (!account) {
-            this.logger.log(`Creating shadow AccountEntity for Deriv account ${platformId}`);
+            this.logger.log(`Creating AccountEntity for Deriv account ${platformId} (user: ${userId})`);
             account = this.accountRepo.create({
                 userId,
                 mt5Id: platformId,
-                balance: 0,
-                equity: 0,
+                name: accountName,
+                broker: 'Deriv',
+                type: accountType,
+                currency: currency || 'USD',
+                balance: initialBalance || 0,
+                equity: initialBalance || 0,
+                initialBalance: initialBalance || 0,
                 margin: 0,
                 marginFree: 0,
                 marginLevel: 0,
@@ -185,9 +319,18 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                 lastSeen: new Date()
             });
             await this.accountRepo.save(account);
-        } else if (account.userId !== userId) {
-            // Re-assign if needed (e.g. account moved between internal users)
-            account.userId = userId;
+        } else {
+            account.broker = 'Deriv';
+            if (account.name === 'Conta Principal' || !account.name) {
+                account.name = accountName;
+            }
+            if (currency) account.currency = currency;
+            if (initialBalance > 0 && Number(account.balance) === 0) {
+                account.balance = initialBalance;
+                account.equity = initialBalance;
+            }
+            account.isConnected = true;
+            account.lastSeen = new Date();
             await this.accountRepo.save(account);
         }
         return account;
@@ -200,28 +343,90 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                 this.subscriptions.delete(userId);
             }
 
-            client.send({ transaction: 1, subscribe: 1 });
+            const compositeSub = new Subscription();
 
-            const sub = client.onMessage('transaction').subscribe((msg: any) => {
+            // 1. Live transactions (trades open & close)
+            client.send({ transaction: 1, subscribe: 1 });
+            const txSub = client.onMessage('transaction').subscribe((msg: any) => {
                 try {
-                    if (msg.transaction) {
+                    if (msg.transaction && msg.transaction.action) {
                         this.handleTransaction(userId, msg.transaction);
                     }
                 } catch (err) {
                     this.logger.error(`Error handling transaction for user ${userId}: ${err.message}`);
                 }
             });
+            compositeSub.add(txSub);
 
-            this.subscriptions.set(userId, sub);
-            this.logger.log(`Subscriptions setup for user ${userId}`);
+            // 2. Live balance stream
+            client.send({ balance: 1, subscribe: 1 });
+            const balSub = client.onMessage('balance').subscribe((msg: any) => {
+                try {
+                    if (msg.balance) {
+                        this.handleBalanceUpdate(userId, msg.balance);
+                    }
+                } catch (err) {
+                    this.logger.error(`Error handling balance update for user ${userId}: ${err.message}`);
+                }
+            });
+            compositeSub.add(balSub);
+
+            // 3. Live open contracts stream (proposal_open_contract) for real-time trade ticks and settlements
+            client.send({ proposal_open_contract: 1, subscribe: 1 });
+            const pocSub = client.onMessage('proposal_open_contract').subscribe((msg: any) => {
+                try {
+                    if (msg.proposal_open_contract && msg.proposal_open_contract.contract_id) {
+                        this.handleProposalOpenContract(userId, msg.proposal_open_contract);
+                    }
+                } catch (err) {
+                    this.logger.error(`Error handling proposal_open_contract for user ${userId}: ${err.message}`);
+                }
+            });
+            compositeSub.add(pocSub);
+
+            this.subscriptions.set(userId, compositeSub);
+            this.logger.log(`Subscriptions (transaction, balance & open contracts) active for user ${userId}`);
         } catch (err) {
             this.logger.error(`Failed to setup subscriptions for user ${userId}: ${err.message}`);
         }
     }
 
+    private async handleProposalOpenContract(userId: string, contract: any) {
+        const accountId = this.accountIds.get(userId);
+        if (!accountId || !contract?.contract_id) return;
+
+        const contractId = contract.contract_id.toString();
+        this.logger.debug(`Live proposal_open_contract update for ${contractId}: status=${contract.status}, profit=${contract.profit}`);
+
+        try {
+            await this.consolidateTrade(userId, accountId, contractId, contract);
+
+            if (contract.is_sold === 1 || contract.is_expired === 1) {
+                const client = this.clients.get(userId);
+                if (client) {
+                    client.send({ balance: 1 });
+                }
+            }
+        } catch (err) {
+            this.logger.warn(`Failed to process live contract update ${contractId}: ${err.message}`);
+        }
+    }
+
+    private async handleBalanceUpdate(userId: string, balanceData: any) {
+        const accountId = this.accountIds.get(userId);
+        if (!accountId) return;
+
+        const newBalance = parseFloat(balanceData.balance) || 0;
+        await this.accountRepo.update({ id: accountId }, {
+            balance: newBalance,
+            equity: newBalance,
+            lastSeen: new Date(),
+            isConnected: true
+        });
+    }
+
     private async handleTransaction(userId: string, transaction: any) {
-        if (!transaction?.id) {
-            this.logger.debug(`Ignoring sparse transaction message for user ${userId}: ${JSON.stringify(transaction)}`);
+        if (!transaction?.id || !transaction?.action) {
             return;
         }
 
@@ -231,12 +436,13 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
             return;
         }
 
-        this.logger.log(`New transaction for user ${userId} (Account: ${accountId}): ${transaction.action || 'unknown'} | ID: ${transaction.id}`);
+        const realTxId = (transaction.transaction_id || transaction.id).toString();
+        this.logger.log(`New transaction for user ${userId} (Account: ${accountId}): ${transaction.action} | ID: ${realTxId}`);
 
         // 1. Save raw transaction
         const txDate = this.mt5Service.safeDate(transaction.transaction_time);
         await this.transactionRepo.upsert({
-            transactionId: transaction.id.toString(),
+            transactionId: realTxId,
             contractId: transaction.contract_id?.toString(),
             userId,
             action: transaction.action as any,
@@ -459,8 +665,6 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                 this.logger.warn(`Failed to fetch portfolio for user ${userId}: ${e.message}`);
             }
 
-            const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-
             // 2. Fetch Statement (Broad reconciliation) with pagination
             try {
                 this.logger.log(`Fetching statement for history reconciliation (user ${userId})`);
@@ -472,9 +676,9 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                     loops++;
                     const statementRes: any = await client.request({
                         statement: 1,
+                        description: 1,
                         limit: 100,
-                        offset,
-                        date_from: thirtyDaysAgo
+                        offset
                     }, 'statement');
 
                     const statementTxs = statementRes.statement?.transactions || [];
@@ -525,10 +729,10 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
                     loops++;
                     const profitTableRes: any = await client.request({
                         profit_table: 1,
+                        description: 1,
                         limit: 100,
                         offset,
-                        sort: 'DESC',
-                        date_from: thirtyDaysAgo
+                        sort: 'DESC'
                     }, 'profit_table');
 
                     const transactions = profitTableRes.profit_table?.transactions || [];
@@ -591,6 +795,10 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
 
             // 5. Immediate repair for existing malformed trades
             await this.repairMalformedTrades(userId);
+
+            // 6. Record last sync timestamp
+            await this.derivAuthRepo.update({ userId, isActive: true }, { lastSyncAt: new Date() });
+            this.logger.log(`History sync successfully finalized for user ${userId}`);
         } catch (e) {
             this.logger.error(`History sync failed completely for user ${userId}`, e.stack);
         }
@@ -616,13 +824,88 @@ export class DerivService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
+    async getStatus(userId: string) {
+        const auth = await this.derivAuthRepo.findOne({ where: { userId, isActive: true } });
+        if (!auth) {
+            return {
+                isConnected: false,
+                isStreaming: false,
+                accountId: null,
+                currency: null,
+                balance: 0,
+                equity: 0,
+                accountName: null,
+                accountEntityId: null,
+                lastSyncAt: null
+            };
+        }
+
+        const accountId = auth.accountEntityId || this.accountIds.get(userId);
+        let account: AccountEntity | null = null;
+        if (accountId) {
+            account = await this.accountRepo.findOne({ where: { id: accountId } });
+        }
+        if (!account) {
+            account = await this.accountRepo.findOne({ where: { userId, mt5Id: auth.accountId } });
+        }
+
+        const isWsConnected = this.clients.get(userId)?.getIsAuthorized() || false;
+
+        return {
+            isConnected: true,
+            isStreaming: isWsConnected,
+            accountId: auth.accountId,
+            currency: account?.currency || auth.currency || 'USD',
+            balance: account ? Number(account.balance) : (auth.metadata?.balance || 0),
+            equity: account ? Number(account.equity) : (auth.metadata?.balance || 0),
+            accountName: account?.name || `Deriv (${auth.accountId})`,
+            accountEntityId: account?.id || auth.accountEntityId,
+            lastSyncAt: auth.lastSyncAt || account?.lastSeen || auth.updatedAt
+        };
+    }
+
+    async triggerSync(userId: string) {
+        const auth = await this.derivAuthRepo.findOne({ where: { userId, isActive: true } });
+        if (!auth) {
+            throw new NotFoundException('Nenhuma conta Deriv ativa vinculada a este usuário');
+        }
+
+        let client = this.clients.get(userId);
+        if (!client || !client.getIsAuthorized()) {
+            await this.connectAccount(auth);
+            client = this.clients.get(userId);
+        }
+
+        if (client) {
+            this.syncHistory(userId, client).catch(err => {
+                this.logger.error(`Error during triggerSync for user ${userId}: ${err.message}`);
+            });
+            return { success: true, message: 'Sincronização de histórico iniciada em segundo plano' };
+        }
+
+        throw new Error('Não foi possível conectar com o servidor da Deriv');
+    }
+
     async disconnect(userId: string) {
+        if (this.subscriptions.has(userId)) {
+            this.subscriptions.get(userId).unsubscribe();
+            this.subscriptions.delete(userId);
+        }
+
         const client = this.clients.get(userId);
         if (client) {
             client.disconnect();
             this.clients.delete(userId);
         }
+
+        const accountId = this.accountIds.get(userId);
+        if (accountId) {
+            await this.accountRepo.update({ id: accountId }, { isConnected: false });
+        }
+        this.accountIds.delete(userId);
+
         await this.derivAuthRepo.update({ userId }, { isActive: false });
+        this.logger.log(`Deriv account disconnected successfully for user ${userId}`);
         return { success: true };
     }
 }

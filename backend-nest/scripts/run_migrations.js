@@ -194,6 +194,46 @@ async function runMigrations() {
         await querySafe(client, 'CREATE INDEX IF NOT EXISTS idx_leaderboard_ranks_user_id ON leaderboard_ranks(user_id)');
         await querySafe(client, 'CREATE INDEX IF NOT EXISTS idx_leaderboard_ranks_rank ON leaderboard_ranks(rank ASC)');
 
+        console.log('\n--- 8. Deriv Integration Tables ---');
+        await querySafe(client, `
+            CREATE TABLE IF NOT EXISTS "deriv_auth" (
+                "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+                "userId" character varying NOT NULL,
+                "account_id" character varying NOT NULL,
+                "encryptedToken" text NOT NULL,
+                "currency" character varying,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "metadata" jsonb,
+                "account_entity_id" character varying,
+                "last_sync_at" TIMESTAMP,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_deriv_auth" PRIMARY KEY ("id")
+            );
+        `);
+        await querySafe(client, `ALTER TABLE "deriv_auth" ADD COLUMN IF NOT EXISTS "account_entity_id" character varying`);
+        await querySafe(client, `ALTER TABLE "deriv_auth" ADD COLUMN IF NOT EXISTS "last_sync_at" TIMESTAMP`);
+
+        await querySafe(client, `
+            CREATE TABLE IF NOT EXISTS "deriv_transactions" (
+                "transactionId" character varying NOT NULL,
+                "contractId" character varying,
+                "userId" character varying NOT NULL,
+                "action" character varying,
+                "amount" numeric(20,2) NOT NULL,
+                "balance" numeric(20,2),
+                "currency" character varying(10),
+                "transactionTime" TIMESTAMP NOT NULL,
+                "processed" boolean NOT NULL DEFAULT false,
+                "raw" jsonb,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_deriv_transactions" PRIMARY KEY ("transactionId")
+            );
+        `);
+        await querySafe(client, 'CREATE INDEX IF NOT EXISTS "IDX_deriv_transactions_contractId" ON "deriv_transactions" ("contractId")');
+        console.log('✓ "deriv_auth" and "deriv_transactions" verified.');
+
         // Mark TypeORM migrations table if exists
         await querySafe(client, `
             CREATE TABLE IF NOT EXISTS "migrations" (

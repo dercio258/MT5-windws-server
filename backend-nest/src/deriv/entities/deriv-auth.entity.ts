@@ -28,6 +28,12 @@ export class DerivAuthEntity {
     @Column({ type: 'jsonb', nullable: true })
     metadata: any; // Store extra info like scopes, account type, etc.
 
+    @Column({ name: 'account_entity_id', nullable: true })
+    accountEntityId: string; // Links directly to AccountEntity.id
+
+    @Column({ type: 'timestamp', nullable: true, name: 'last_sync_at' })
+    lastSyncAt: Date;
+
     @CreateDateColumn()
     createdAt: Date;
 

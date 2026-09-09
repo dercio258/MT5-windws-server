@@ -6,25 +6,41 @@ import { filter, map } from 'rxjs/operators';
 export class DerivClient {
     private readonly logger = new Logger(DerivClient.name);
     private ws: WebSocket;
-    private readonly url = 'wss://ws.binaryws.com/websockets/v3?app_id=1089'; // Using default dev app_id for now
+    private readonly appId: string;
+    private url: string;
     private messageSubject = new Subject<any>();
     private connectionSubject = new Subject<boolean>();
     private isConnected = false;
     private isAuthorized = false;
+    private isManuallyClosed = false;
     private reconnectInterval = 5000;
     private maxReconnectAttempts = 50;
     private reconnectAttempts = 0;
     private pingIntervalHandle: any;
 
-    constructor() { }
+    constructor(appId?: string) {
+        this.appId = appId || process.env.DERIV_APP_ID || '1089';
+        this.url = `wss://ws.binaryws.com/websockets/v3?app_id=${this.appId}`;
+    }
 
-    connect(): Promise<void> {
+    connect(targetUrl?: string): Promise<void> {
+        this.isManuallyClosed = false;
+        if (targetUrl) {
+            this.url = targetUrl;
+        } else if (!this.url) {
+            this.url = `wss://ws.binaryws.com/websockets/v3?app_id=${this.appId}`;
+        }
+
         return new Promise((resolve, reject) => {
             this.ws = new WebSocket(this.url);
 
             this.ws.on('open', () => {
-                this.logger.log('Connected to Deriv WebSocket');
+                const isOtp = this.url.includes('otp=');
+                this.logger.log(`Connected to Deriv WebSocket (${isOtp ? 'OTP-authenticated gateway' : 'Standard gateway'})`);
                 this.isConnected = true;
+                if (isOtp) {
+                    this.isAuthorized = true;
+                }
                 this.reconnectAttempts = 0;
                 this.connectionSubject.next(true);
                 this.startPing();
@@ -72,12 +88,14 @@ export class DerivClient {
     }
 
     private handleReconnect() {
+        if (this.isManuallyClosed) return;
+
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             const interval = this.reconnectAttempts > 10 ? 15000 : this.reconnectInterval;
             this.logger.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${interval / 1000}s...`);
             setTimeout(() => {
-                if (!this.isConnected) {
+                if (!this.isConnected && !this.isManuallyClosed) {
                     this.connect().catch(() => { });
                 }
             }, interval);
@@ -168,6 +186,7 @@ export class DerivClient {
     }
 
     disconnect() {
+        this.isManuallyClosed = true;
         this.stopPing();
         if (this.ws) {
             this.ws.removeAllListeners();
