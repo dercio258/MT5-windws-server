@@ -5,9 +5,6 @@ import {
     DollarSign,
     Calendar,
     BarChart3,
-    BarChart2,
-    Clock,
-    Shield,
     ArrowUpRight,
     ArrowDownRight,
     RefreshCw,
@@ -22,7 +19,8 @@ import {
 } from 'chart.js';
 import { PerformanceRadar } from '../components/dashboard/charts/PerformanceRadar';
 import { DailyPnLChart } from '../components/dashboard/charts/DailyPnLChart';
-import { InstrumentRow, SessionRow, TraderHealthWidget, detectPnLStatus, WinrateGauge, WinRateGaugeChart, ProfitFactorDonut } from '../components/dashboard/StatsWidgets';
+import { OperationalRadars } from '../components/dashboard/charts/OperationalRadars';
+import { detectPnLStatus, WinrateGauge, WinRateGaugeChart, ProfitFactorDonut } from '../components/dashboard/StatsWidgets';
 import { useDashboardStats, useSubscriptionStatus, useTradesFallback } from '../hooks/useDashboard';
 import { useAuth } from '../context/AuthContext';
 import { useAccount } from '../context/AccountContext';
@@ -249,57 +247,67 @@ export const Dashboard = () => {
         const isLondon = currentHour >= 8 && currentHour < 17;
         const isNY = currentHour >= 13 && currentHour < 22;
         const isAsian = currentHour >= 0 && currentHour < 9;
+        const isSydney = currentHour >= 21 || currentHour < 6;
 
-        const standardSessions = ['London', 'New York', 'Asian'];
+        const standardSessions = ['London', 'New York', 'Asian', 'Sydney'];
         const existingSessions = rawSessions.map((s: any) => s.session);
 
         const mergedSessions = [...rawSessions];
         standardSessions.forEach(s => {
-            if (!existingSessions.some((es: string) => es.includes(s))) {
+            if (!existingSessions.some((es: string) => es.toLowerCase().includes(s.toLowerCase()))) {
                 mergedSessions.push({ session: s, count: 0, pnl: 0 });
             }
         });
 
-        const totalSessionTrades = mergedSessions.reduce((acc: number, s: any) => acc + s.count, 0);
+        const totalSessionTrades = mergedSessions.reduce((acc: number, s: any) => acc + (s.count || 0), 0);
 
-        return mergedSessions
-            .sort((a: any, b: any) => Math.abs(b.pnl) - Math.abs(a.pnl))
-            .map((s: any) => {
-                const name = s.session === 'Asian' ? 'Ásia' :
-                    s.session === 'London' ? 'Londres' :
-                        s.session === 'New York' ? 'Nova Iorque' : s.session;
+        return mergedSessions.map((s: any) => {
+            const raw = (s.session || '').toLowerCase();
+            const name = raw.includes('asian') || raw.includes('asia') || raw.includes('tokyo') ? 'Ásia' :
+                raw.includes('london') ? 'Londres' :
+                raw.includes('new york') || raw.includes('ny') ? 'Nova Iorque' :
+                raw.includes('sydney') ? 'Sydney' : s.session;
 
-                return {
-                    name,
-                    percent: totalSessionTrades ? (s.count / totalSessionTrades) * 100 : 0,
-                    pnl: s.pnl || 0,
-                    active: (s.session.includes('London') && isLondon) ||
-                        (s.session.includes('New York') && isNY) ||
-                        ((s.session.includes('Tokyo') || s.session.includes('Sydney') || s.session.includes('Asia') || s.session.includes('Asian')) && isAsian)
-                };
-            });
+            return {
+                name,
+                percent: totalSessionTrades ? ((s.count || 0) / totalSessionTrades) * 100 : 0,
+                pnl: s.pnl || 0,
+                count: s.count || 0,
+                active: (s.session.includes('London') && isLondon) ||
+                    (s.session.includes('New York') && isNY) ||
+                    (s.session.includes('Sydney') && isSydney) ||
+                    ((s.session.includes('Tokyo') || s.session.includes('Asia') || s.session.includes('Asian')) && isAsian)
+            };
+        });
     }, [stats?.bySession]);
 
     const instrumentsData = useMemo(() => {
         if (stats?.bySymbol) {
             return stats.bySymbol
-                .map((s: any) => ({ symbol: s.symbol, wins: s.wins || 0, losses: s.losses || 0, total: (s.wins || 0) + (s.losses || 0) }))
+                .map((s: any) => ({ 
+                    symbol: s.symbol, 
+                    wins: s.wins || 0, 
+                    losses: s.losses || 0, 
+                    total: (s.wins || 0) + (s.losses || 0),
+                    pnl: s.pnl !== undefined ? Number(s.pnl) : undefined
+                }))
                 .sort((a: any, b: any) => b.total - a.total)
                 .slice(0, 5);
         }
 
         if (Array.isArray(tradesFallback)) {
-            const instrumentMap = new Map<string, { wins: number, losses: number }>();
+            const instrumentMap = new Map<string, { wins: number, losses: number, pnl: number }>();
             tradesFallback.forEach((t: any) => {
                 const profit = Number(t.profit) + Number(t.commission) + Number(t.swap);
                 const symbol = t.symbol.replace(/m$/, '');
-                if (!instrumentMap.has(symbol)) instrumentMap.set(symbol, { wins: 0, losses: 0 });
+                if (!instrumentMap.has(symbol)) instrumentMap.set(symbol, { wins: 0, losses: 0, pnl: 0 });
                 const inst = instrumentMap.get(symbol)!;
+                inst.pnl += profit;
                 if (profit > 0.1) inst.wins++;
                 else if (profit < -0.1) inst.losses++;
             });
             return Array.from(instrumentMap.entries())
-                .map(([symbol, data]) => ({ symbol, ...data, total: data.wins + data.losses }))
+                .map(([symbol, data]) => ({ symbol, ...data, total: data.wins + data.losses, pnl: Number(data.pnl.toFixed(2)) }))
                 .sort((a, b) => b.total - a.total)
                 .slice(0, 5);
         }
@@ -571,88 +579,24 @@ export const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* INSTITUTIONAL OPERATIONAL BREAKDOWN (3 COLUMNS) */}
+                    {/* INSTITUTIONAL OPERATIONAL BREAKDOWN (3 RADAR CARDS) */}
                     <div className="space-y-2.5">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xs font-bold uppercase tracking-wider text-[#F3F4F6] flex items-center gap-1.5">
+                            <h2 className="text-xs font-bold uppercase tracking-wider text-[#F3F4F6] flex items-center gap-1.5 font-mono">
                                 <Activity size={14} className="text-emerald-400" />
                                 Detalhamento Operacional
                             </h2>
                             <span className="text-[10px] text-[#6B7280] font-mono">
-                                Ativos, Sessões e Disciplina
+                                Ativos, Sessões e Dias da Semana
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 items-stretch">
-                            {/* Card 1: Top Instrumentos */}
-                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
-                                <div>
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
-                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
-                                            <BarChart2 size={13} className="text-emerald-400" />
-                                            Top Instrumentos
-                                        </span>
-                                        <span className="text-[10px] text-[#6B7280] font-mono">Winrate</span>
-                                    </div>
-                                    <div className="flex flex-col gap-0.5">
-                                        {instrumentsData.map((item: any, idx: number) => (
-                                            <InstrumentRow key={idx} {...item} />
-                                        ))}
-                                        {instrumentsData.length === 0 && (
-                                            <div className="flex flex-col items-center justify-center py-8 text-center">
-                                                <Activity size={20} className="text-[#4B5563] mb-1.5" />
-                                                <span className="text-xs text-[#6B7280]">Nenhum trade no período</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {instrumentsData.length > 0 && (
-                                    <div className="pt-2 mt-2 border-t border-white/[0.06] flex justify-between items-center text-[10px] text-[#6B7280] font-mono">
-                                        <span>Total: {instrumentsData.length} pares</span>
-                                        <span>Ranking por volume</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Card 2: Sessões Operacionais */}
-                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
-                                <div>
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
-                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
-                                            <Clock size={13} className="text-emerald-400" />
-                                            Sessões Operacionais
-                                        </span>
-                                        <span className="text-[10px] text-[#6B7280] font-mono">PnL / Volume</span>
-                                    </div>
-                                    <div className="flex flex-col gap-0.5">
-                                        {sessionsData.map((session: any, idx: number) => (
-                                            <SessionRow key={idx} {...session} />
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="pt-2 mt-2 border-t border-white/[0.06] flex justify-between items-center text-[10px] text-[#6B7280] font-mono">
-                                    <span>Horário UTC</span>
-                                    <span>Centros globais</span>
-                                </div>
-                            </div>
-
-                            {/* Card 3: Saúde & Disciplina */}
-                            <div className="bg-[#111319] border border-white/[0.08] rounded-xl p-4 card-hover flex flex-col justify-between">
-                                <div>
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.06]">
-                                        <span className="text-xs sm:text-[13px] font-bold text-[#F3F4F6] uppercase tracking-wide flex items-center gap-1.5">
-                                            <Shield size={13} className="text-emerald-400" />
-                                            Saúde & Disciplina
-                                        </span>
-                                        <span className="text-[10px] text-[#6B7280] font-mono">Comportamento</span>
-                                    </div>
-                                    <TraderHealthWidget
-                                        score={currentStats.healthScore?.score}
-                                        details={currentStats.healthScore?.details}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <OperationalRadars
+                            instrumentsData={instrumentsData}
+                            sessionsData={sessionsData}
+                            trades={tradesFallback}
+                            dailyPnL={currentStats.dailyPnL}
+                        />
                     </div>
                 </>
             )}

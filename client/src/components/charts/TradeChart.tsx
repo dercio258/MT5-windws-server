@@ -145,20 +145,21 @@ export const TradeChart = ({ symbol, openTime, closeTime, type }: TradeChartProp
             // Add markers for entry and exit
             const openTs = new Date(openTime).getTime() / 1000;
             const closeTs = new Date(closeTime).getTime() / 1000;
+            const isBuy = String(type).toUpperCase() === 'BUY';
 
             const markers = [
                 {
                     time: openTs as Time,
-                    position: type === 'BUY' ? 'belowBar' : 'aboveBar',
+                    position: isBuy ? 'belowBar' : 'aboveBar',
                     color: '#3b82f6', // Blue
-                    shape: type === 'BUY' ? 'arrowUp' : 'arrowDown',
+                    shape: isBuy ? 'arrowUp' : 'arrowDown',
                     text: 'ENTRY',
                 },
                 {
                     time: closeTs as Time,
-                    position: type === 'BUY' ? 'aboveBar' : 'belowBar',
+                    position: isBuy ? 'aboveBar' : 'belowBar',
                     color: '#f59e0b', // Amber
-                    shape: type === 'BUY' ? 'arrowDown' : 'arrowUp', // Exit shape
+                    shape: isBuy ? 'arrowDown' : 'arrowUp', // Exit shape
                     text: 'EXIT',
                 }
             ];

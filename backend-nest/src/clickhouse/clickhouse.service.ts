@@ -159,7 +159,6 @@ export class ClickHouseService implements OnModuleInit {
                 params.rating = metadata.rating;
             }
             if (updates.length > 0) {
-                updates.push('updatedAt = now()');
                 await this.client.command({
                     query: `ALTER TABLE trades UPDATE ${updates.join(', ')} WHERE id = {id:String}`,
                     query_params: params

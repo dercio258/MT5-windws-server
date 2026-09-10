@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-    BarChart3, Calendar, Download, Printer, Briefcase, TrendingUp, 
+    Calendar, Download, Printer, Briefcase, TrendingUp, 
     TrendingDown, Percent, Activity, ShieldAlert,
-    Clock, Layers, PieChart, ChevronLeft, ChevronRight,
-    Search
+    ChevronLeft, ChevronRight, Search
 } from 'lucide-react';
 import { useAccount } from '../context/AccountContext';
 import { Button } from '../components/ui/Button';
+import { OperationalRadars } from '../components/dashboard/charts/OperationalRadars';
+import { TradingCalendarView } from '../components/reports/TradingCalendarView';
 import api from '../api';
 import {
     Chart as ChartJS,
@@ -21,7 +22,7 @@ import {
     Legend as ChartLegend,
     Filler
 } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
 ChartJS.register(
     CategoryScale,
@@ -35,15 +36,6 @@ ChartJS.register(
     ChartLegend,
     Filler
 );
-
-const SESSION_COLORS = [
-    { bg: '#38bdf8', border: '#0284c7' }, // Sky Blue (London)
-    { bg: '#818cf8', border: '#4f46e5' }, // Indigo (New York)
-    { bg: '#f59e0b', border: '#d97706' }, // Amber (Asia)
-    { bg: '#10b981', border: '#059669' }, // Emerald (Overlap)
-    { bg: '#ec4899', border: '#db2777' }, // Pink
-    { bg: '#a855f7', border: '#9333ea' }  // Purple
-];
 
 export const Reports = () => {
     const { selectedAccountId, selectedAccount, accounts, isConsolidated, selectAccount } = useAccount();
@@ -236,55 +228,35 @@ export const Reports = () => {
         };
     }, [reportData?.equityCurve]);
 
-    // Chart.js: Distribuição Diária de Resultados (dias com loss abaixo de zero)
-    const dailyPnLChartData = useMemo(() => {
-        if (!reportData?.dailyPnL || reportData.dailyPnL.length === 0) return null;
+    // Operational Radar Metrics (Symbol & Session)
+    const operationalInstrumentsData = useMemo(() => {
+        if (!reportData?.bySymbol || !Array.isArray(reportData.bySymbol)) return [];
+        return reportData.bySymbol.map((s: any) => {
+            const total = Number(s.trades) || 0;
+            const wins = s.wins !== undefined ? Number(s.wins) : (s.winRate ? Math.round((Number(s.winRate) / 100) * total) : 0);
+            const losses = s.losses !== undefined ? Number(s.losses) : Math.max(0, total - wins);
+            return {
+                symbol: s.symbol,
+                wins,
+                losses,
+                total: total || (wins + losses),
+                pnl: s.pnl !== undefined ? Number(s.pnl) : undefined
+            };
+        }).sort((a: any, b: any) => b.total - a.total).slice(0, 6);
+    }, [reportData?.bySymbol]);
 
-        const labels = reportData.dailyPnL.map((d: any) => {
-            const parts = d.date.split('-');
-            return parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.date;
+    const operationalSessionsData = useMemo(() => {
+        if (!reportData?.bySession || !Array.isArray(reportData.bySession)) return [];
+        const totalTrades = reportData.bySession.reduce((acc: number, s: any) => acc + (Number(s.trades) || 0), 0) || 1;
+        return reportData.bySession.map((s: any) => {
+            const count = Number(s.trades) || 0;
+            return {
+                name: s.session,
+                percent: (count / totalTrades) * 100,
+                pnl: Number(s.pnl) || 0,
+                count
+            };
         });
-
-        return {
-            labels,
-            datasets: [
-                {
-                    label: 'P&L Diário ($)',
-                    data: reportData.dailyPnL.map((d: any) => d.pnl),
-                    backgroundColor: reportData.dailyPnL.map((d: any) => 
-                        d.pnl >= 0 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(244, 63, 94, 0.85)'
-                    ),
-                    hoverBackgroundColor: reportData.dailyPnL.map((d: any) => 
-                        d.pnl >= 0 ? '#10b981' : '#f43f5e'
-                    ),
-                    borderColor: reportData.dailyPnL.map((d: any) => 
-                        d.pnl >= 0 ? '#059669' : '#e11d48'
-                    ),
-                    borderWidth: 1,
-                    borderRadius: 3
-                }
-            ]
-        };
-    }, [reportData?.dailyPnL]);
-
-    // Chart.js: Gráfico de Pizza para Eficiência por Sessão
-    const sessionPieChartData = useMemo(() => {
-        if (!reportData?.bySession || reportData.bySession.length === 0) return null;
-
-        return {
-            labels: reportData.bySession.map((s: any) => s.session?.toUpperCase() || 'GERAL'),
-            datasets: [
-                {
-                    data: reportData.bySession.map((s: any) => s.trades),
-                    backgroundColor: reportData.bySession.map((_: any, idx: number) => 
-                        SESSION_COLORS[idx % SESSION_COLORS.length].bg
-                    ),
-                    borderColor: '#0f172a',
-                    borderWidth: 2,
-                    hoverOffset: 6
-                }
-            ]
-        };
     }, [reportData?.bySession]);
 
     // Configuração com Linha de Zero Destacada (Losses abaixo de zero)
@@ -354,33 +326,7 @@ export const Reports = () => {
         }
     }), []);
 
-    const sessionPieOptions = useMemo(() => ({
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            },
-            tooltip: {
-                backgroundColor: '#090d16',
-                titleColor: '#e2e8f0',
-                bodyColor: '#cbd5e1',
-                borderColor: '#1e293b',
-                borderWidth: 1,
-                padding: 10,
-                callbacks: {
-                    label: (context: any) => {
-                        const sess = reportData?.bySession?.[context.dataIndex];
-                        if (!sess) return '';
-                        const totalTrades = reportData.bySession.reduce((acc: number, s: any) => acc + s.trades, 0) || 1;
-                        const pct = ((sess.trades / totalTrades) * 100).toFixed(1);
-                        return ` ${sess.session}: ${sess.trades} ops (${pct}%) • PnL: ${sess.pnl >= 0 ? '+' : ''}$${sess.pnl.toFixed(2)}`;
-                    }
-                }
-            }
-        },
-        cutout: '62%'
-    }), [reportData?.bySession]);
+
 
     const kpis = reportData?.kpis;
     const accountInfo = reportData?.accountInfo;
@@ -671,238 +617,111 @@ export const Reports = () => {
                                 <span className="text-slate-500 block">Volume Negociado</span>
                                 <span className="font-bold text-slate-800 dark:text-slate-200">{kpis.totalVolume} lotes</span>
                             </div>
-                            <div>
-                                <span className="text-slate-500 block">Comissões & Swaps</span>
-                                <span className="font-bold text-slate-700 dark:text-slate-300">-${(kpis.totalCommission + kpis.totalSwap).toFixed(2)}</span>
-                            </div>
-                        </div>
-
-                        {/* Equity Curve & Daily PnL Visual Charts (Losses abaixo do zero) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                            {/* Resultado por Operação / Execuções */}
-                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between shadow-xs dark:shadow-none">
-                                <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-                                    <div>
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
-                                            <TrendingUp size={16} className="text-emerald-600 dark:text-emerald-400" />
-                                            {executionChartMode === 'executions' ? 'Resultado por Operação' : 'Curva de Lucro Acumulado'}
-                                        </h3>
-                                        <p className="text-[11px] text-slate-500">
-                                            {executionChartMode === 'executions'
-                                                ? 'Operações com loss destacadas abaixo da linha de zero ($0)'
-                                                : 'Evolução acumulada do capital ao longo das operações'}
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 p-1 rounded-lg">
-                                        <button
-                                            onClick={() => setExecutionChartMode('executions')}
-                                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                                                executionChartMode === 'executions'
-                                                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
-                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                            }`}
-                                        >
-                                            Por Operação
-                                        </button>
-                                        <button
-                                            onClick={() => setExecutionChartMode('cumulative')}
-                                            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                                                executionChartMode === 'cumulative'
-                                                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
-                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                            }`}
-                                        >
-                                            Acumulado
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="h-56 w-full relative">
-                                    {executionChartMode === 'cumulative' ? (
-                                        cumulativeLineData ? (
-                                            <Line data={cumulativeLineData} options={zeroBaselineChartOptions as any} />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
-                                                Sem dados suficientes para gerar o gráfico
-                                            </div>
-                                        )
-                                    ) : (
-                                        executionsBarData ? (
-                                            <Bar data={executionsBarData} options={zeroBaselineChartOptions as any} />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
-                                                Sem dados suficientes para gerar o gráfico
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-
-                                <div className="flex justify-between text-[10px] text-slate-500 mt-2 border-t border-slate-200 dark:border-slate-800/60 pt-2 font-mono">
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Lucros (&gt; $0)
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Perdas / Loss (&lt; $0)
-                                    </span>
-                                    <span>{reportData.equityCurve?.length || 0} execuções</span>
+                                <div>
+                                    <span className="text-slate-500 block">Comissões & Swaps</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">-${(kpis.totalCommission + kpis.totalSwap).toFixed(2)}</span>
                                 </div>
                             </div>
 
-                            {/* Daily PnL Distribution Bars (Losses abaixo do zero) */}
-                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 flex flex-col justify-between shadow-xs dark:shadow-none">
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
-                                            <BarChart3 size={16} className="text-indigo-600 dark:text-indigo-400" />
-                                            Distribuição Diária de Resultados
-                                        </h3>
-                                        <p className="text-[11px] text-slate-500">
-                                            Dias negativos destacados abaixo da linha de zero ($0)
-                                        </p>
-                                    </div>
-                                    <span className="text-xs text-slate-500 font-mono">
-                                        {reportData.dailyPnL?.length || 0} dias
-                                    </span>
-                                </div>
-
-                                <div className="h-56 w-full relative">
-                                    {dailyPnLChartData ? (
-                                        <Bar data={dailyPnLChartData} options={zeroBaselineChartOptions as any} />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
-                                            Sem operações registradas no período
+                            {/* Row: Gráfico por Operação & Calendário Operacional Inline */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-stretch">
+                                {/* 1. Resultado por Operação / Curva de Lucro Acumulado */}
+                                <div className="bg-slate-50 dark:bg-[#111319] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-white/[0.08] flex flex-col justify-between shadow-xs dark:shadow-none h-full min-w-0">
+                                    <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                                                <TrendingUp size={16} className="text-emerald-500 dark:text-emerald-400" />
+                                                {executionChartMode === 'executions' ? 'Resultado por Operação' : 'Curva de Lucro Acumulado'}
+                                            </h3>
+                                            <p className="text-[11px] text-slate-500">
+                                                {executionChartMode === 'executions'
+                                                    ? 'Operações com loss destacadas abaixo da linha de zero ($0)'
+                                                    : 'Evolução acumulada do capital ao longo das operações'}
+                                            </p>
                                         </div>
-                                    )}
-                                </div>
 
-                                <div className="flex justify-between text-[10px] text-slate-500 mt-2 border-t border-slate-200 dark:border-slate-800/60 pt-2 font-mono">
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Dias Positivos (&gt; $0)
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Dias Negativos (&lt; $0)
-                                    </span>
-                                    <span>Linha de base = Ponto Zero ($0)</span>
-                                </div>
-                            </div>
-                        </div>
+                                        <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-[#08090C] border border-slate-300 dark:border-white/[0.06] p-1 rounded-lg">
+                                            <button
+                                                onClick={() => setExecutionChartMode('executions')}
+                                                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                                                    executionChartMode === 'executions'
+                                                        ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                                }`}
+                                            >
+                                                Por Operação
+                                            </button>
+                                            <button
+                                                onClick={() => setExecutionChartMode('cumulative')}
+                                                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                                                    executionChartMode === 'cumulative'
+                                                        ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                                }`}
+                                            >
+                                                Acumulado
+                                            </button>
+                                        </div>
+                                    </div>
 
-                        {/* Breakdown Grids: By Symbol, Session, Day of Week */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                            {/* Performance By Symbol */}
-                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 shadow-xs dark:shadow-none">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 mb-4 flex items-center gap-2">
-                                    <PieChart size={16} className="text-blue-500 dark:text-blue-400" />
-                                    Performance por Ativo
-                                </h3>
-                                <div className="space-y-3">
-                                    {reportData.bySymbol && reportData.bySymbol.length > 0 ? (
-                                        reportData.bySymbol.map((s: any) => (
-                                            <div key={s.symbol} className="bg-white dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-xs dark:shadow-none">
-                                                <div>
-                                                    <span className="font-bold text-slate-900 dark:text-slate-200 text-xs">{s.symbol}</span>
-                                                    <span className="text-[10px] text-slate-500 block">{s.trades} trades • {s.winRate}% win</span>
+                                    <div className="h-64 sm:h-72 lg:h-[300px] w-full relative my-auto">
+                                        {executionChartMode === 'cumulative' ? (
+                                            cumulativeLineData ? (
+                                                <Line data={cumulativeLineData} options={zeroBaselineChartOptions as any} />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                                    Sem dados suficientes para gerar o gráfico
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className={`text-xs font-bold ${s.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                        {s.pnl >= 0 ? '+' : ''}${s.pnl}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{s.volume} lotes</span>
+                                            )
+                                        ) : (
+                                            executionsBarData ? (
+                                                <Bar data={executionsBarData} options={zeroBaselineChartOptions as any} />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
+                                                    Sem dados suficientes para gerar o gráfico
                                                 </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-slate-400 dark:text-slate-600 text-xs">Nenhum ativo registrado.</p>
-                                    )}
+                                            )
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-between text-[10px] text-slate-500 mt-2 border-t border-slate-200 dark:border-white/[0.06] pt-2 font-mono">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Lucros (&gt; $0)
+                                        </span>
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Perdas / Loss (&lt; $0)
+                                        </span>
+                                        <span>{reportData.equityCurve?.length || 0} execuções registradas</span>
+                                    </div>
+                                </div>
+
+                                {/* 2. Calendário Operacional de Resultados */}
+                                <div className="h-full min-w-0 flex flex-col">
+                                    <TradingCalendarView
+                                        trades={reportData.trades}
+                                        dailyPnL={reportData.dailyPnL}
+                                    />
                                 </div>
                             </div>
 
-                            {/* Performance By Session (Com Gráfico de Pizza) */}
-                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 flex flex-col justify-between shadow-xs dark:shadow-none">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2">
-                                        <Clock size={16} className="text-amber-500 dark:text-amber-400" />
-                                        Eficiência por Sessão
-                                    </h3>
-                                    <span className="text-[11px] text-slate-500 font-mono">
-                                        {reportData.bySession?.reduce((sum: number, s: any) => sum + s.trades, 0) || 0} trades
-                                    </span>
-                                </div>
-
-                                {reportData.bySession && reportData.bySession.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {/* Gráfico de Pizza / Doughnut */}
-                                        <div className="h-44 w-full relative flex items-center justify-center">
-                                            <Doughnut data={sessionPieChartData!} options={sessionPieOptions} />
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                                <span className="text-lg font-black text-slate-900 dark:text-slate-100 font-mono">
-                                                    {reportData.bySession.length}
-                                                </span>
-                                                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">
-                                                    Sessões
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Lista Detalhada com Badges e PnL */}
-                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                            {reportData.bySession.map((sess: any, idx: number) => {
-                                                const color = SESSION_COLORS[idx % SESSION_COLORS.length];
-                                                const totalSessionTrades = reportData.bySession.reduce((acc: number, s: any) => acc + s.trades, 0) || 1;
-                                                const pct = ((sess.trades / totalSessionTrades) * 100).toFixed(0);
-
-                                                return (
-                                                    <div key={sess.session} className="bg-white dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex justify-between items-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors shadow-xs dark:shadow-none">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color.bg }} />
-                                                            <div>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-bold text-slate-900 dark:text-slate-200 text-xs uppercase">{sess.session}</span>
-                                                                    <span className="text-[10px] text-slate-500 font-mono">({pct}%)</span>
-                                                                </div>
-                                                                <span className="text-[10px] text-slate-500 block">
-                                                                    {sess.trades} ops • <span className="text-slate-600 dark:text-slate-400 font-semibold">{sess.winRate}% win</span>
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className={`text-xs font-bold font-mono ${sess.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                                {sess.pnl >= 0 ? '+' : ''}${sess.pnl.toFixed(2)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-44 flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs">
-                                        Sem dados de sessão registrados no período.
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Performance By Day of Week */}
-                            <div className="bg-slate-50 dark:bg-slate-950/40 p-5 rounded-xl border border-slate-200 dark:border-slate-800/80 lg:col-span-1 shadow-xs dark:shadow-none">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200 mb-4 flex items-center gap-2">
-                                    <Layers size={16} className="text-purple-500 dark:text-purple-400" />
-                                    Dias da Semana
+                        {/* Radar de Performance Operacional (Ativos, Sessões, Dias) */}
+                        <div className="mb-8 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-[#F3F4F6] flex items-center gap-1.5 font-mono">
+                                    <Activity size={14} className="text-emerald-500 dark:text-emerald-400" />
+                                    Detalhamento Operacional (Radares)
                                 </h3>
-                                <div className="space-y-2.5">
-                                    {reportData.byDayOfWeek && reportData.byDayOfWeek.map((d: any) => (
-                                        <div key={d.day} className="flex items-center justify-between text-xs py-1 border-b border-slate-200 dark:border-slate-800/50 last:border-none">
-                                            <span className="text-slate-700 dark:text-slate-300 font-medium">{d.day}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-slate-500 text-[11px]">{d.trades} trades</span>
-                                                <span className={`font-bold w-20 text-right ${d.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                    {d.pnl >= 0 ? '+' : ''}${d.pnl}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <span className="text-[10px] text-slate-500 dark:text-[#6B7280] font-mono">
+                                    Ativos, Sessões e Dias da Semana
+                                </span>
                             </div>
+
+                            <OperationalRadars
+                                instrumentsData={operationalInstrumentsData}
+                                sessionsData={operationalSessionsData}
+                                trades={reportData.trades}
+                                dailyPnL={reportData.dailyPnL}
+                            />
                         </div>
 
                         {/* Trade Ledger Table */}

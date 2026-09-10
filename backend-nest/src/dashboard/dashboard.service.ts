@@ -675,14 +675,35 @@ export class DashboardService {
         const accounts = await this.accountRepo.find({ where: { userId } });
         if (accounts.length === 0) throw new NotFoundException('Conta não encontrada');
 
-        let trade;
+        const accountIds = accounts.map(a => a.id);
+
+        let trade: any = null;
         try {
             trade = await this.tradeRepo.findOne({
-                where: { id: id, accountId: In(accounts.map(a => a.id)) }
+                where: { id: id, accountId: In(accountIds) }
             });
+
+            if (!trade) {
+                trade = await this.tradeRepo.findOne({
+                    where: [
+                        { ticket: id, accountId: In(accountIds) },
+                        { contractId: id, accountId: In(accountIds) }
+                    ]
+                });
+            }
         } catch (e) {
-            console.warn(`Invalid trade ID format for fetch: ${id}`);
-            return null;
+            console.warn(`Initial trade lookup failed for ${id}, trying fallback:`, e);
+            try {
+                trade = await this.tradeRepo.findOne({
+                    where: [
+                        { ticket: id, accountId: In(accountIds) },
+                        { contractId: id, accountId: In(accountIds) }
+                    ]
+                });
+            } catch (err2) {
+                console.warn(`Fallback trade lookup failed:`, err2);
+                return null;
+            }
         }
 
         if (!trade) {
@@ -695,15 +716,50 @@ export class DashboardService {
             siblingTrades = await this.tradeRepo.find({
                 where: {
                     contractId: trade.contractId,
-                    accountId: In(accounts.map(a => a.id))
+                    accountId: trade.accountId
                 },
                 order: { closeTime: 'ASC' }
             });
         }
 
-        return {
+        // Get technicalJournal and mentalLog for trade date
+        const tradeDate = trade.closeTime
+            ? new Date(trade.closeTime).toISOString().split('T')[0]
+            : (trade.openTime ? new Date(trade.openTime).toISOString().split('T')[0] : null);
+
+        let technicalJournal = null;
+        let mentalLog = null;
+
+        if (tradeDate) {
+            technicalJournal = await this.techJournalRepo.findOne({
+                where: { accountId: trade.accountId, date: tradeDate }
+            });
+            if (!technicalJournal && accountIds.length > 0) {
+                technicalJournal = await this.techJournalRepo.findOne({
+                    where: { accountId: In(accountIds), date: tradeDate }
+                });
+            }
+
+            mentalLog = await this.mentalLogRepo.findOne({
+                where: { accountId: trade.accountId, date: tradeDate }
+            });
+            if (!mentalLog && accountIds.length > 0) {
+                mentalLog = await this.mentalLogRepo.findOne({
+                    where: { accountId: In(accountIds), date: tradeDate }
+                });
+            }
+        }
+
+        const tradeObj = {
             ...trade,
             siblings: siblingTrades.filter(s => s.id !== trade.id)
+        };
+
+        return {
+            ...tradeObj,
+            trade: tradeObj,
+            technicalJournal,
+            mentalLog
         };
     }
 
@@ -711,9 +767,24 @@ export class DashboardService {
         const accounts = await this.accountRepo.find({ where: { userId } });
         if (accounts.length === 0) throw new NotFoundException('Conta não encontrada');
 
-        const trade = await this.tradeRepo.findOne({
-            where: { id: id, accountId: In(accounts.map(a => a.id)) }
-        });
+        const accountIds = accounts.map(a => a.id);
+        let trade: any = null;
+        try {
+            trade = await this.tradeRepo.findOne({
+                where: { id: id, accountId: In(accountIds) }
+            });
+        } catch (e) {
+            // Ignore UUID parse error
+        }
+
+        if (!trade) {
+            trade = await this.tradeRepo.findOne({
+                where: [
+                    { ticket: id, accountId: In(accountIds) },
+                    { contractId: id, accountId: In(accountIds) }
+                ]
+            });
+        }
 
         if (!trade) throw new NotFoundException('Trade não encontrado');
 

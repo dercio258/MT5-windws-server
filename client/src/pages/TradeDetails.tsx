@@ -7,8 +7,8 @@ import { useAuth } from '../context/AuthContext';
 
 interface TradeDetail {
     trade: {
-        id: number;
-        ticket: number;
+        id: string | number;
+        ticket: string | number;
         symbol: string;
         type: string;
         volume: number;
@@ -102,9 +102,23 @@ export const TradeDetails = () => {
         const fetchDetails = async () => {
             try {
                 const res = await api.get(`/dashboard/trades/${id}`);
-                setData(res.data);
+                if (res.data) {
+                    const tradeData = res.data.trade || res.data;
+                    if (tradeData && (tradeData.id || tradeData.symbol)) {
+                        setData({
+                            trade: tradeData,
+                            technicalJournal: res.data.technicalJournal || null,
+                            mentalLog: res.data.mentalLog || null
+                        });
+                    } else {
+                        setData(null);
+                    }
+                } else {
+                    setData(null);
+                }
             } catch (err) {
                 console.error('Failed to fetch trade details', err);
+                setData(null);
             } finally {
                 setIsLoading(false);
             }
@@ -260,11 +274,14 @@ export const TradeDetails = () => {
     }
 
     const { trade, technicalJournal, mentalLog } = data;
-    const netProfit = Number(trade.profit) + Number(trade.commission) + Number(trade.swap);
-    const grossProfit = Number(trade.profit);
+    const netProfit = Number(trade.profit || 0) + Number(trade.commission || 0) + Number(trade.swap || 0);
+    const grossProfit = Number(trade.profit || 0);
     const isWin = netProfit >= 0;
-    const duration = new Date(trade.closeTime).getTime() - new Date(trade.openTime).getTime();
-    const durationStr = new Date(duration).toISOString().substr(11, 8);
+    const isBuy = String(trade.type).toUpperCase() === 'BUY';
+    const openTimeMs = trade.openTime ? new Date(trade.openTime).getTime() : 0;
+    const closeTimeMs = trade.closeTime ? new Date(trade.closeTime).getTime() : 0;
+    const duration = closeTimeMs && openTimeMs ? Math.max(0, closeTimeMs - openTimeMs) : 0;
+    const durationStr = duration > 0 ? new Date(duration).toISOString().substr(11, 8) : '--:--:--';
 
     return (
         <div className="p-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -328,12 +345,12 @@ export const TradeDetails = () => {
                         <div>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-2xl font-bold text-white">
-                                    {trade.symbol} <span className="text-slate-500 text-lg font-mono">#{trade.ticket || trade.id.toString().split('-')[0]}</span>
+                                    {trade.symbol} <span className="text-slate-500 text-lg font-mono">#{trade.ticket || (typeof trade.id === 'string' ? trade.id.split('-')[0] : trade.id)}</span>
                                 </h1>
                                 <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isWin ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
                                     {isWin ? 'WIN' : 'LOSS'}
                                 </span>
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${trade.type === 'BUY' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${isBuy ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                                     {trade.type}
                                 </span>
                             </div>

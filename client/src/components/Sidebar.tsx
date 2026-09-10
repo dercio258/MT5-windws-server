@@ -124,12 +124,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
                     </span>
                     <span className="truncate">{label}</span>
                 </div>
-                <div className="flex items-center gap-1 shrink-0 ml-1">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider">
-                        Breve
-                    </span>
-                    <Lock size={12} className="text-amber-500/70 dark:text-amber-400/70 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors" />
-                </div>
+
             </button>
         ) : (
             <NavLink

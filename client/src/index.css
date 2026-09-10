@@ -108,6 +108,28 @@ html.light {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 
+/* Radar Performance Cards */
+.radar-card {
+    background: linear-gradient(180deg, rgba(16, 21, 34, 0.9) 0%, rgba(10, 14, 23, 0.95) 100%);
+    border: 1px solid #1a2336;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.radar-card:hover {
+    border-color: rgba(59, 130, 246, 0.35);
+    box-shadow: 0 14px 38px -5px rgba(0, 0, 0, 0.8), 0 0 20px -3px rgba(59, 130, 246, 0.15);
+}
+html.light .radar-card {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+html.light .radar-card:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
 /* Synchronized Candlestick & Wick Terminal Animations */
 @keyframes candleLivePulse {
     0%, 100% {

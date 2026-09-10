@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
-import { ChatWidget } from '../components/network/ChatWidget';
+import { WhatsAppSupportWidget } from '../components/support/WhatsAppSupportWidget';
 import { useAuth } from '../context/AuthContext';
 import { PlanRequiredOverlay } from '../components/subscription/PlanRequiredOverlay';
 import { OnboardingSurvey } from '../components/onboarding/OnboardingSurvey';
@@ -58,8 +58,8 @@ export const MainLayout = () => {
                     </div>
                 </div>
 
-                {/* Global Chat Widget */}
-                <ChatWidget />
+                {/* Floating WhatsApp Support Button */}
+                <WhatsAppSupportWidget />
             </main>
         </div>
     );
