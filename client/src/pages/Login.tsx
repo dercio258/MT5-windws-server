@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import { CandlestickHeroBackground } from '../components/landing/CandlestickBackground';
 
-const TOREX_ICON = "https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png";
+const TOREX_ICON = "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg";
 
 // --- Custom UI Components (Local for Login Layout) ---
 
@@ -503,8 +503,8 @@ export const Login = () => {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3.5">
-                                    <LoginButton 
-                                        variant="outline" 
+                                    <LoginButton
+                                        variant="outline"
                                         className="h-11 text-xs sm:text-sm font-semibold"
                                         onClick={() => {
                                             window.location.href = '/api/auth/google';
@@ -512,8 +512,8 @@ export const Login = () => {
                                     >
                                         <GoogleIcon className="mr-2" /> Google
                                     </LoginButton>
-                                    <LoginButton 
-                                        variant="outline" 
+                                    <LoginButton
+                                        variant="outline"
                                         className="h-11 text-xs sm:text-sm font-semibold"
                                         onClick={() => {
                                             window.location.href = '/api/auth/github';

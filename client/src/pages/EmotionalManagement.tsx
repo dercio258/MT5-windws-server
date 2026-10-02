@@ -346,11 +346,10 @@ const EmotionalManagement = () => {
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => selectAccount('all')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                    isConsolidated
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${isConsolidated
                                         ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
                                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                                }`}
+                                    }`}
                             >
                                 Todas
                             </button>
@@ -358,16 +357,14 @@ const EmotionalManagement = () => {
                                 <button
                                     key={acc.id}
                                     onClick={() => selectAccount(acc.id)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                        selectedAccountId === acc.id
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${selectedAccountId === acc.id
                                             ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                                    }`}
+                                        }`}
                                 >
                                     <span>{acc.name}</span>
-                                    <span className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase ${
-                                        String(acc.type).toUpperCase() === 'LIVE' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300' : 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
-                                    }`}>
+                                    <span className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase ${String(acc.type).toUpperCase() === 'LIVE' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300' : 'bg-blue-500/20 text-blue-600 dark:text-blue-300'
+                                        }`}>
                                         {acc.type}
                                     </span>
                                 </button>
@@ -389,7 +386,7 @@ const EmotionalManagement = () => {
                 <div className="lg:col-span-3 bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 flex flex-wrap justify-between items-center gap-4 mb-0 shadow-xs">
                     <div className="flex items-center gap-4">
                         <img
-                            src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
+                            src="https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg"
                             alt="TOREX Logo"
                             className="w-12 h-12 object-contain"
                             crossOrigin="anonymous"

@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import { CandlestickHeroBackground } from '../components/landing/CandlestickBackground';
 
-const TOREX_ICON = "https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png";
+const TOREX_ICON = "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg";
 
 // --- Type Definitions ---
 interface Country {
@@ -510,9 +510,9 @@ export const Register = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3.5">
-                                <RegisterButton 
+                                <RegisterButton
                                     type="button"
-                                    variant="outline" 
+                                    variant="outline"
                                     className="h-11 text-xs sm:text-sm font-semibold"
                                     onClick={() => {
                                         window.location.href = '/api/auth/google';
@@ -520,9 +520,9 @@ export const Register = () => {
                                 >
                                     <GoogleIcon className="mr-2" /> Google
                                 </RegisterButton>
-                                <RegisterButton 
+                                <RegisterButton
                                     type="button"
-                                    variant="outline" 
+                                    variant="outline"
                                     className="h-11 text-xs sm:text-sm font-semibold"
                                     onClick={() => {
                                         window.location.href = '/api/auth/github';

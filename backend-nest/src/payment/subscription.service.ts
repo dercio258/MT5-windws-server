@@ -1006,4 +1006,186 @@ export class SubscriptionService implements OnModuleInit {
             hasUsedTrial: true
         };
     }
+
+    async adminAdjustUserSubscription(
+        userId: string,
+        data: {
+            action: 'ASSIGN' | 'EXTEND' | 'CANCEL';
+            planConfigId?: string;
+            tier?: string;
+            days?: number;
+            customExpiryDate?: string;
+            reason?: string;
+        }
+    ) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new Error('Usuário não encontrado');
+        }
+
+        const now = new Date();
+
+        if (data.action === 'CANCEL') {
+            const activeSubs = await this.subscriptionRepo.find({
+                where: { userId, status: SubscriptionStatus.ACTIVE },
+                relations: ['planConfig']
+            });
+
+            if (activeSubs.length === 0) {
+                return { success: true, message: 'Usuário já não possui plano ativo.' };
+            }
+
+            for (const sub of activeSubs) {
+                sub.status = SubscriptionStatus.CANCELLED;
+                sub.currentPeriodEnd = now;
+                await this.subscriptionRepo.save(sub);
+            }
+
+            await this.cacheManager.del(`user_plan_tier:${userId}`).catch(() => {});
+            await this.cacheManager.del(`user_subscription_status:${userId}`).catch(() => {});
+
+            await this.notificationsService.create(userId, {
+                title: 'Assinatura Encerrada ℹ️',
+                message: `Seu plano foi cancelado pela administração.${data.reason ? ` Motivo: ${data.reason}` : ''}`,
+            });
+
+            return { success: true, message: 'Plano do usuário cancelado com sucesso.' };
+        }
+
+        if (data.action === 'EXTEND') {
+            const activeSub = await this.subscriptionRepo.findOne({
+                where: { userId, status: SubscriptionStatus.ACTIVE },
+                relations: ['planConfig'],
+                order: { currentPeriodEnd: 'DESC' }
+            });
+
+            if (!activeSub) {
+                throw new Error('O usuário não possui plano ativo para estender. Utilize a opção de atribuir um plano.');
+            }
+
+            let newExpiry: Date;
+            if (data.customExpiryDate) {
+                newExpiry = new Date(data.customExpiryDate);
+            } else {
+                const daysToAdd = Number(data.days) || 30;
+                const baseDate = activeSub.currentPeriodEnd && activeSub.currentPeriodEnd > now
+                    ? new Date(activeSub.currentPeriodEnd)
+                    : new Date(now);
+                newExpiry = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+            }
+
+            activeSub.currentPeriodEnd = newExpiry;
+            await this.subscriptionRepo.save(activeSub);
+
+            await this.cacheManager.del(`user_plan_tier:${userId}`).catch(() => {});
+            await this.cacheManager.del(`user_subscription_status:${userId}`).catch(() => {});
+
+            const formattedDate = newExpiry.toLocaleDateString('pt-PT');
+
+            await this.notificationsService.create(userId, {
+                title: 'Plano Estendido! 🚀',
+                message: `A validade do seu plano ${activeSub.planConfig?.tier || 'Ativo'} foi estendida pela administração até ${formattedDate}.${data.reason ? ` Obs: ${data.reason}` : ''}`,
+            });
+
+            if (user.email) {
+                await this.emailService.sendTemplatedEmail(user.email, 'SYSTEM_ALERT', {
+                    title: 'Plano Estendido com Sucesso!',
+                    message: `Olá ${user.name || 'Trader'}, sua assinatura do plano ${activeSub.planConfig?.tier || 'Premium'} foi estendida pelo administrador. Sua nova data de expiração é ${formattedDate}.`,
+                    type: 'SYSTEM'
+                }).catch(err => this.logger.warn(`Could not send extension email: ${err.message}`));
+            }
+
+            return {
+                success: true,
+                message: `Validade estendida com sucesso até ${formattedDate}!`,
+                subscription: activeSub
+            };
+        }
+
+        if (data.action === 'ASSIGN') {
+            let planConfig: SubscriptionPlanConfig | null = null;
+            if (data.planConfigId) {
+                planConfig = await this.planConfigRepo.findOne({ where: { id: data.planConfigId } });
+            }
+            if (!planConfig && data.tier) {
+                const tierUpper = data.tier.toUpperCase();
+                planConfig = await this.planConfigRepo.findOne({
+                    where: [{ tier: tierUpper }, { tier: tierUpper === 'PREMIUM' ? 'PRO' : tierUpper }]
+                });
+            }
+            if (!planConfig) {
+                planConfig = await this.planConfigRepo.findOne({ where: { isActive: true } });
+            }
+
+            if (!planConfig) {
+                throw new Error('Nenhuma configuração de plano encontrada no sistema.');
+            }
+
+            let expiryDate: Date;
+            if (data.customExpiryDate) {
+                expiryDate = new Date(data.customExpiryDate);
+            } else {
+                const days = Number(data.days) || 30;
+                expiryDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            }
+
+            // Cancel any previously active subscriptions
+            const activeSubs = await this.subscriptionRepo.find({
+                where: { userId, status: SubscriptionStatus.ACTIVE }
+            });
+            for (const sub of activeSubs) {
+                sub.status = SubscriptionStatus.CANCELLED;
+                await this.subscriptionRepo.save(sub);
+            }
+
+            // Create new active subscription
+            const cycle = (data.days && data.days >= 360) ? SubscriptionCycle.YEARLY : SubscriptionCycle.MONTHLY;
+            const newSub = this.subscriptionRepo.create({
+                userId,
+                planConfigId: planConfig.id,
+                planConfig,
+                status: SubscriptionStatus.ACTIVE,
+                cycle,
+                paymentMethod: 'ADMIN_MANUAL',
+                paymentReference: `ADMIN_${planConfig.tier}_${Date.now()}`,
+                currentPeriodEnd: expiryDate,
+            });
+
+            await this.subscriptionRepo.save(newSub);
+
+            await this.cacheManager.del(`user_plan_tier:${userId}`).catch(() => {});
+            await this.cacheManager.del(`user_subscription_status:${userId}`).catch(() => {});
+
+            const formattedDate = expiryDate.toLocaleDateString('pt-PT');
+
+            await this.notificationsService.create(userId, {
+                title: `Plano ${planConfig.tier} Atribuído! 🎉`,
+                message: `Um administrador atribuiu o plano ${planConfig.tier} à sua conta com validade até ${formattedDate}.${data.reason ? ` Obs: ${data.reason}` : ''}`,
+            });
+
+            await this.alertsService.create(userId, {
+                type: AlertType.SYSTEM,
+                severity: AlertSeverity.INFO,
+                title: `Plano ${planConfig.tier} Ativado`,
+                description: `Sua conta foi atualizada para o plano ${planConfig.tier} com validade até ${formattedDate}.`,
+                metadata: { assignedBy: 'ADMIN', reference: newSub.paymentReference }
+            }).catch(e => this.logger.warn(`Could not create alert: ${e.message}`));
+
+            if (user.email) {
+                await this.emailService.sendTemplatedEmail(user.email, 'PAYMENT_SUCCESS', {
+                    userName: user.name || 'Trader',
+                    plan: planConfig.tier,
+                    expiryDate: formattedDate
+                }).catch(err => this.logger.warn(`Could not send assignment email: ${err.message}`));
+            }
+
+            return {
+                success: true,
+                message: `Plano ${planConfig.tier} atribuído com sucesso até ${formattedDate}!`,
+                subscription: newSub
+            };
+        }
+
+        throw new Error('Ação inválida especificada');
+    }
 }

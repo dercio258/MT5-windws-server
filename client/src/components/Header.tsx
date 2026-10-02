@@ -3,21 +3,21 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAccount } from '../context/AccountContext';
 import { useTheme } from '../context/ThemeContext';
-import { 
-    Menu, 
-    Sun, 
-    Moon, 
-    Bell, 
-    ChevronDown, 
-    Check, 
-    Briefcase, 
-    Layers, 
-    LogOut, 
-    User, 
-    Settings, 
-    CreditCard, 
-    Shield, 
-    Flame, 
+import {
+    Menu,
+    Sun,
+    Moon,
+    Bell,
+    ChevronDown,
+    Check,
+    Briefcase,
+    Layers,
+    LogOut,
+    User,
+    Settings,
+    CreditCard,
+    Shield,
+    Flame,
     Award,
     Trophy
 } from 'lucide-react';
@@ -28,12 +28,12 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
     const { user, logout } = useAuth();
-    const { 
-        accounts, 
-        selectedAccountId, 
-        selectedAccount, 
-        isConsolidated, 
-        selectAccount 
+    const {
+        accounts,
+        selectedAccountId,
+        selectedAccount,
+        isConsolidated,
+        selectAccount
     } = useAccount();
     const { theme, toggleTheme } = useTheme();
     const location = useLocation();
@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                 {/* Mobile Logo */}
                 <div className="flex md:hidden items-center gap-2">
                     <img
-                        src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
+                        src="https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg"
                         alt="Logo"
                         className="w-7 h-7 object-contain"
                     />
@@ -163,18 +163,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                 <div className="relative" ref={accountMenuRef}>
                     <button
                         onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
-                        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg border transition-all duration-200 group focus:outline-none ${
-                            isAccountMenuOpen
+                        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg border transition-all duration-200 group focus:outline-none ${isAccountMenuOpen
                                 ? 'bg-slate-100 dark:bg-[#161822] border-emerald-500/50 shadow-sm'
                                 : 'bg-slate-50 dark:bg-[#111319] hover:bg-slate-100 dark:hover:bg-[#161822] border-slate-200 dark:border-white/[0.08] hover:border-emerald-500/30'
-                        }`}
+                            }`}
                         title="Alternar Conta de Trading"
                     >
-                        <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border ${
-                            isConsolidated 
-                                ? 'bg-purple-500/20 border-purple-500/30 text-[#A78BFA]' 
+                        <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border ${isConsolidated
+                                ? 'bg-purple-500/20 border-purple-500/30 text-[#A78BFA]'
                                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 dark:text-emerald-400'
-                        }`}>
+                            }`}>
                             {isConsolidated ? <Layers size={13} /> : <Briefcase size={13} />}
                         </div>
 
@@ -201,11 +199,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                             </span>
                         </div>
 
-                        <ChevronDown 
-                            size={13} 
-                            className={`text-slate-400 dark:text-[#6B7280] transition-transform duration-200 ml-0.5 shrink-0 ${
-                                isAccountMenuOpen ? 'rotate-180 text-emerald-500 dark:text-emerald-400' : 'group-hover:text-slate-600 dark:group-hover:text-[#9CA3AF]'
-                            }`} 
+                        <ChevronDown
+                            size={13}
+                            className={`text-slate-400 dark:text-[#6B7280] transition-transform duration-200 ml-0.5 shrink-0 ${isAccountMenuOpen ? 'rotate-180 text-emerald-500 dark:text-emerald-400' : 'group-hover:text-slate-600 dark:group-hover:text-[#9CA3AF]'
+                                }`}
                         />
                     </button>
 
@@ -229,16 +226,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                                         selectAccount('all');
                                         setIsAccountMenuOpen(false);
                                     }}
-                                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all ${
-                                        isConsolidated
+                                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all ${isConsolidated
                                             ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-900 dark:text-white shadow-sm'
                                             : 'hover:bg-slate-100 dark:hover:bg-[#161822] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-transparent'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="flex items-center gap-2.5 overflow-hidden">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${
-                                            isConsolidated ? 'bg-indigo-500/30 border-indigo-500/50 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-[#161822] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-slate-400'
-                                        }`}>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${isConsolidated ? 'bg-indigo-500/30 border-indigo-500/50 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-[#161822] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-slate-400'
+                                            }`}>
                                             <Layers size={16} />
                                         </div>
                                         <div>
@@ -272,16 +267,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                                                 selectAccount(account.id);
                                                 setIsAccountMenuOpen(false);
                                             }}
-                                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all ${
-                                                isSelected
+                                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all ${isSelected
                                                     ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-white shadow-sm'
                                                     : 'hover:bg-slate-100 dark:hover:bg-[#161822] text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white border border-transparent'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${
-                                                    isSelected ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-300' : 'bg-slate-100 dark:bg-[#161822] border-slate-200 dark:border-white/[0.08]'
-                                                }`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${isSelected ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-300' : 'bg-slate-100 dark:bg-[#161822] border-slate-200 dark:border-white/[0.08]'
+                                                    }`}>
                                                     {badge.icon}
                                                 </div>
 
@@ -357,11 +350,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                 <div className="relative" ref={userMenuRef}>
                     <button
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                        className={`flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-lg border transition-all duration-200 group text-left focus:outline-none ${
-                            isUserMenuOpen
+                        className={`flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-lg border transition-all duration-200 group text-left focus:outline-none ${isUserMenuOpen
                                 ? 'bg-slate-100 dark:bg-[#161822] border-emerald-500/50 shadow-sm'
                                 : 'hover:bg-slate-100 dark:hover:bg-[#161822] border-transparent hover:border-slate-200 dark:hover:border-white/[0.08]'
-                        }`}
+                            }`}
                         title="Meu Perfil"
                     >
                         <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 text-[#04110C] font-bold text-xs shadow-md overflow-hidden border border-emerald-400/30">
@@ -381,11 +373,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                             </span>
                         </div>
 
-                        <ChevronDown 
-                            size={14} 
-                            className={`hidden sm:block text-slate-400 dark:text-slate-400 transition-transform duration-200 ml-0.5 ${
-                                isUserMenuOpen ? 'rotate-180 text-emerald-500 dark:text-emerald-400' : 'group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                            }`} 
+                        <ChevronDown
+                            size={14}
+                            className={`hidden sm:block text-slate-400 dark:text-slate-400 transition-transform duration-200 ml-0.5 ${isUserMenuOpen ? 'rotate-180 text-emerald-500 dark:text-emerald-400' : 'group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                                }`}
                         />
                     </button>
 

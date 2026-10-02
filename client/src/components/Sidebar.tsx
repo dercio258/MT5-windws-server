@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
-import { 
-    LayoutDashboard, 
-    BookOpen, 
-    TrendingUp, 
-    BrainCircuit, 
-    CalendarDays, 
-    FlaskConical, 
-    Users, 
+import {
+    LayoutDashboard,
+    BookOpen,
+    TrendingUp,
+    BrainCircuit,
+    CalendarDays,
+    FlaskConical,
+    Users,
     Trophy,
-    X, 
-    Lock 
+    X,
+    Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,11 +27,11 @@ const DevelopmentModal = ({ featureName, onClose }: { featureName: string; onClo
     }
 
     return createPortal(
-        <div 
+        <div
             className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
-            <div 
+            <div
                 className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative overflow-hidden flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
@@ -55,7 +55,7 @@ const DevelopmentModal = ({ featureName, onClose }: { featureName: string; onClo
                 <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
                     {featureName} em Desenvolvimento
                 </h3>
-                
+
                 <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6 max-w-xs">
                     {description}
                 </p>
@@ -95,17 +95,17 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         if (onClose) onClose();
     };
 
-    const NavItem = ({ 
-        to, 
-        icon, 
-        label, 
-        requiresPremium, 
-        inDevelopment 
-    }: { 
-        to: string; 
-        icon: React.ReactNode; 
-        label: string; 
-        requiresPremium?: boolean; 
+    const NavItem = ({
+        to,
+        icon,
+        label,
+        requiresPremium,
+        inDevelopment
+    }: {
+        to: string;
+        icon: React.ReactNode;
+        label: string;
+        requiresPremium?: boolean;
         inDevelopment?: boolean;
     }) => (
         inDevelopment ? (
@@ -167,7 +167,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
                 <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-white/[0.08] shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <img
-                            src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
+                            src="https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg"
                             alt="Torex Logo"
                             className="w-7 h-7 object-contain shrink-0 drop-shadow-sm"
                         />
@@ -178,8 +178,8 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
                         </div>
                     </div>
                     {onClose && (
-                        <button 
-                            onClick={onClose} 
+                        <button
+                            onClick={onClose}
                             className="md:hidden p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#161822] rounded-lg cursor-pointer transition-colors"
                             title="Fechar menu"
                         >

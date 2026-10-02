@@ -153,4 +153,21 @@ export class AdminController {
     async getUserSubscriptions(@Param('id') id: string) {
         return this.subscriptionService.getUserSubscriptionHistory(id);
     }
+
+    // --- Admin User Plan Assignment & Extension ---
+    @UseGuards(AdminAuthGuard)
+    @Post('users/:id/subscription')
+    async adjustUserSubscription(
+        @Param('id') id: string,
+        @Body() body: {
+            action: 'ASSIGN' | 'EXTEND' | 'CANCEL';
+            planConfigId?: string;
+            tier?: string;
+            days?: number;
+            customExpiryDate?: string;
+            reason?: string;
+        }
+    ) {
+        return this.subscriptionService.adminAdjustUserSubscription(id, body);
+    }
 }

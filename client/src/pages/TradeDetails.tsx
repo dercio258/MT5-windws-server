@@ -85,7 +85,7 @@ export const TradeDetails = () => {
     const [publishCaption, setPublishCaption] = useState('');
     const [publishVisibility, setPublishVisibility] = useState('public');
     const [isPublishing, setIsPublishing] = useState(false);
-    
+
     // Edit Mode State
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({
@@ -142,13 +142,13 @@ export const TradeDetails = () => {
         try {
             setIsSaving(true);
             await api.patch(`/dashboard/trades/${id}`, editForm);
-            
+
             // Refresh local data
             setData(prev => prev ? {
                 ...prev,
                 trade: { ...prev.trade, ...editForm }
             } : null);
-            
+
             setIsEditing(false);
         } catch (err) {
             console.error('Failed to update trade', err);
@@ -326,7 +326,7 @@ export const TradeDetails = () => {
                 {/* Watermark Logo (Visible only in explicit printed content visually due to layout rendering) */}
                 <div className={`absolute top-6 right-8 z-10 ${isPrinting || isPublishing ? 'opacity-100' : 'opacity-0'} pointer-events-none flex flex-col items-end transition-opacity duration-300`}>
                     <div className="flex items-center gap-3 mb-2 drop-shadow-2xl">
-                        <img src="https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png" alt="Torex Journal Logo" className="h-10 w-10 object-contain drop-shadow-lg" />
+                        <img src="https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg" alt="Torex Journal Logo" className="h-10 w-10 object-contain drop-shadow-lg" />
                         <div className="text-3xl font-black text-white tracking-tighter uppercase leading-none">
                             Torex<span className="text-blue-500">Journal</span>
                         </div>
@@ -401,19 +401,19 @@ export const TradeDetails = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Setup</label>
-                                <input 
+                                <input
                                     className="w-full bg-slate-900 border-slate-800 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
                                     value={editForm.setup}
-                                    onChange={e => setEditForm({...editForm, setup: e.target.value})}
+                                    onChange={e => setEditForm({ ...editForm, setup: e.target.value })}
                                     placeholder="Ex: Breakout H1"
                                 />
                             </div>
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Humor</label>
-                                <select 
+                                <select
                                     className="w-full bg-slate-900 border-slate-800 rounded-lg text-sm p-2 text-white outline-none focus:border-indigo-500 transition-colors"
                                     value={editForm.mood}
-                                    onChange={e => setEditForm({...editForm, mood: e.target.value})}
+                                    onChange={e => setEditForm({ ...editForm, mood: e.target.value })}
                                 >
                                     <option value="">Selecione...</option>
                                     <option value="Focado">Focado</option>
@@ -426,10 +426,10 @@ export const TradeDetails = () => {
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Avaliação</label>
                                 <div className="flex gap-1">
-                                    {[1,2,3,4,5].map(n => (
-                                        <button 
+                                    {[1, 2, 3, 4, 5].map(n => (
+                                        <button
                                             key={n}
-                                            onClick={() => setEditForm({...editForm, rating: n})}
+                                            onClick={() => setEditForm({ ...editForm, rating: n })}
                                             className={`flex-1 h-9 rounded border flex items-center justify-center font-bold text-xs transition-all ${editForm.rating >= n ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-500'}`}
                                         >
                                             {n}
@@ -438,7 +438,7 @@ export const TradeDetails = () => {
                                 </div>
                             </div>
                             <div className="flex items-end">
-                                <button 
+                                <button
                                     onClick={handleUpdateTrade}
                                     disabled={isSaving}
                                     className="w-full h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2"
@@ -450,10 +450,10 @@ export const TradeDetails = () => {
                         </div>
                         <div>
                             <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Lições Aprendidas</label>
-                            <textarea 
+                            <textarea
                                 className="w-full bg-slate-900 border-slate-800 rounded-lg text-sm p-3 text-white outline-none h-20 resize-none focus:border-indigo-500 transition-colors"
                                 value={editForm.lesson}
-                                onChange={e => setEditForm({...editForm, lesson: e.target.value})}
+                                onChange={e => setEditForm({ ...editForm, lesson: e.target.value })}
                                 placeholder="O que você aprendeu com este trade?"
                             />
                         </div>

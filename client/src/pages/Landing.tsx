@@ -18,8 +18,8 @@ import {
     ShieldCheck,
     Check
 } from 'lucide-react';
-import { 
-    CandlestickHeroBackground 
+import {
+    CandlestickHeroBackground
 } from '../components/landing/CandlestickBackground';
 
 export const Landing = () => {
@@ -44,14 +44,14 @@ export const Landing = () => {
 
     // Official Cloudinary Assets
     const ASSETS = {
-        awardImage: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788819073/IMG-20260906-WA0001_1_xok24x.jpg",
+        awardImage: "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790960005698_9c1b15b912b83c8c_img-20260911-wa0018.jpg",
         mascotRocket: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788819094/mascot-rocket-BkEtyIqW_ji8mlc.png",
-        dashboardMockup: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788877350/dashboard_wj9lpc.png",
-        reportsMockup: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788877350/relatorio_a6kwqd.png",
+        dashboardMockup: "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790959463602_0d9ff4122d063a3e_img-20260911-wa0012.jpg",
+        reportsMockup: "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790960143809_ed412afba184c0fa_img-20260911-wa0022.jpg",
         tradesMockup: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788877350/Trades_pnp8yf.png",
         calendarMockup: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788877349/calendario_k8oloj.png",
         emotionsMockup: "https://res.cloudinary.com/dndlqdylc/image/upload/v1788877349/emotions_xkvq0d.png",
-        logo: "https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png"
+        logo: "https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg"
     };
 
     const PREVIEW_TABS = [
@@ -94,7 +94,7 @@ export const Landing = () => {
     return (
         <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-emerald-500/25 overflow-x-hidden">
             {/* Subtle Ambient Background Grid Pattern */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none opacity-[0.025] z-0"
                 style={{
                     backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px)`,
@@ -103,11 +103,10 @@ export const Landing = () => {
             />
 
             {/* Navbar */}
-            <nav className={`fixed w-full z-50 transition-all duration-300 ${
-                scrolled 
-                    ? 'bg-[#08090C]/90 backdrop-blur-xl border-b border-white/[0.07] py-3 shadow-2xl' 
-                    : 'bg-transparent py-5'
-            }`}>
+            <nav className={`fixed w-full z-50 transition-all duration-300 ${scrolled
+                ? 'bg-[#08090C]/90 backdrop-blur-xl border-b border-white/[0.07] py-3 shadow-2xl'
+                : 'bg-transparent py-5'
+                }`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2.5 group cursor-pointer">
                         <img
@@ -133,13 +132,13 @@ export const Landing = () => {
 
                     {/* Desktop Auth CTA */}
                     <div className="hidden md:flex items-center gap-3">
-                        <Link 
-                            to="/login" 
+                        <Link
+                            to="/login"
                             className="text-sm font-semibold text-[#9CA3AF] hover:text-[#F3F4F6] px-4 py-2 rounded-lg hover:bg-[#161822] transition-all"
                         >
                             Entrar
                         </Link>
-                        <Link 
+                        <Link
                             to="/register"
                             className="text-sm font-semibold px-5 py-2 bg-[#10B981] hover:bg-[#34D399] text-[#04110C] rounded-full transition-all duration-200 hover:shadow-[0_0_24px_rgba(16,185,129,0.30)] active:scale-95 shadow-sm flex items-center gap-1.5"
                         >
@@ -161,44 +160,44 @@ export const Landing = () => {
                 {/* Mobile Menu Dropdown */}
                 {mobileMenuOpen && (
                     <div className="md:hidden absolute top-full left-0 w-full bg-[#0E1017] border-b border-white/[0.08] p-5 flex flex-col gap-3 shadow-2xl animate-in slide-in-from-top-2">
-                        <a 
-                            href="#plataforma" 
-                            onClick={() => setMobileMenuOpen(false)} 
+                        <a
+                            href="#plataforma"
+                            onClick={() => setMobileMenuOpen(false)}
                             className="text-[#9CA3AF] hover:text-emerald-400 py-2 text-sm font-medium"
                         >
                             Plataforma
                         </a>
-                        <a 
-                            href="#recursos" 
-                            onClick={() => setMobileMenuOpen(false)} 
+                        <a
+                            href="#recursos"
+                            onClick={() => setMobileMenuOpen(false)}
                             className="text-[#9CA3AF] hover:text-emerald-400 py-2 text-sm font-medium"
                         >
                             Recursos
                         </a>
-                        <a 
-                            href="#premiacoes" 
-                            onClick={() => setMobileMenuOpen(false)} 
+                        <a
+                            href="#premiacoes"
+                            onClick={() => setMobileMenuOpen(false)}
                             className="text-[#9CA3AF] hover:text-emerald-400 py-2 text-sm font-medium flex items-center justify-between"
                         >
                             <span>Premiações</span>
                             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full">3 MESES</span>
                         </a>
-                        <Link 
-                            to="/pricing" 
-                            onClick={() => setMobileMenuOpen(false)} 
+                        <Link
+                            to="/pricing"
+                            onClick={() => setMobileMenuOpen(false)}
                             className="text-[#9CA3AF] hover:text-emerald-400 py-2 text-sm font-medium"
                         >
                             Planos
                         </Link>
                         <div className="pt-2 border-t border-white/[0.08] flex flex-col gap-2">
-                            <Link 
-                                to="/login" 
+                            <Link
+                                to="/login"
                                 className="text-center py-2 text-sm font-semibold text-[#F3F4F6] bg-[#111319] rounded-lg border border-white/[0.08]"
                             >
                                 Entrar
                             </Link>
-                            <Link 
-                                to="/register" 
+                            <Link
+                                to="/register"
                                 className="text-center py-2.5 text-sm font-semibold text-[#04110C] bg-[#10B981] rounded-full shadow-md"
                             >
                                 Começar Grátis
@@ -221,7 +220,7 @@ export const Landing = () => {
                         </div>
 
                         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#F3F4F6] tracking-tight leading-[1.1] mb-6">
-                           Pare de operar no achismo. <span className="text-emerald-400">Comece a operar com dados.</span>
+                            Pare de operar no achismo. <span className="text-emerald-400">Comece a operar com dados.</span>
                         </h1>
 
                         <p className="text-base sm:text-lg text-[#9CA3AF] leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
@@ -230,7 +229,7 @@ export const Landing = () => {
 
                         {/* CTA Buttons */}
                         <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5">
-                            <Link 
+                            <Link
                                 to="/register"
                                 className="w-full sm:w-auto px-7 py-3.5 bg-[#10B981] hover:bg-[#34D399] text-[#04110C] font-semibold text-sm rounded-full transition-all duration-200 hover:shadow-[0_0_24px_rgba(16,185,129,0.30)] active:scale-95 shadow-md flex items-center justify-center gap-2"
                             >
@@ -238,7 +237,7 @@ export const Landing = () => {
                                 <ArrowRight size={16} strokeWidth={2.5} />
                             </Link>
 
-                            <Link 
+                            <Link
                                 to="/login"
                                 className="w-full sm:w-auto px-6 py-3.5 bg-[#111319] hover:bg-[#161822] text-[#9CA3AF] hover:text-[#F3F4F6] font-semibold text-sm rounded-full border border-white/[0.08] hover:border-emerald-500/40 transition-all duration-200 flex items-center justify-center"
                             >
@@ -251,7 +250,7 @@ export const Landing = () => {
                     <div className="lg:col-span-6 flex flex-col justify-center relative w-full">
                         {/* Glow ambient expandido */}
                         <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500/30 via-emerald-400/20 to-teal-500/15 rounded-3xl blur-2xl opacity-80 pointer-events-none" />
-                        
+
                         <div className="relative w-full rounded-2xl bg-[#0E1017] border border-emerald-500/40 p-2 sm:p-2.5 shadow-2xl overflow-hidden group">
                             <div className="relative w-full overflow-hidden rounded-xl bg-[#08090C] border border-white/[0.05]">
                                 <img
@@ -289,11 +288,10 @@ export const Landing = () => {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer border ${
-                                        isActive
-                                            ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)] scale-105'
-                                            : 'bg-[#111319] text-[#9CA3AF] border-white/[0.08] hover:border-white/[0.2] hover:text-white hover:bg-[#161822]'
-                                    }`}
+                                    className={`px-4 sm:px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer border ${isActive
+                                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)] scale-105'
+                                        : 'bg-[#111319] text-[#9CA3AF] border-white/[0.08] hover:border-white/[0.2] hover:text-white hover:bg-[#161822]'
+                                        }`}
                                 >
                                     <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-emerald-400'}`} />
                                     <span>{tab.label}</span>
@@ -607,7 +605,7 @@ export const Landing = () => {
                                 </div>
                             </div>
 
-                            <Link 
+                            <Link
                                 to="/register"
                                 className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#10B981] hover:bg-[#34D399] text-[#04110C] font-semibold text-sm rounded-full transition-all duration-200 hover:shadow-[0_0_24px_rgba(16,185,129,0.30)] active:scale-95 shadow-md"
                             >

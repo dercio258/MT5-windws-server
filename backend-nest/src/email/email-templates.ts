@@ -14,48 +14,48 @@ export interface EmailTemplateData {
     subject?: string;
 }
 
-export const TOREX_LOGO_URL = 'https://res.cloudinary.com/dndlqdylc/image/upload/v1769335429/Touro_design_1_beuv9b.png';
+export const TOREX_LOGO_URL = 'https://pub-354475384fd04c1e8c075e14e17ed14d.r2.dev/produtos/originals/1790957899791_0521d2dc46a60392_touro_design_1.jpeg';
 
 /**
  * Default subject line generator for each email template type
  */
 export const TemplateSubjects = {
-    OTP_CODE: (data: { otp?: string }) => 
+    OTP_CODE: (data: { otp?: string }) =>
         `[Torex Journal] Seu código de verificação: ${data?.otp || ''}`,
 
-    WELCOME_EMAIL: (data: { userName?: string }) => 
+    WELCOME_EMAIL: (data: { userName?: string }) =>
         `Bem-vindo ao Torex Journal — Domine seus dados e impulsione seu trading`,
 
-    LOGIN_ALERT: (data: { ip?: string; device?: string }) => 
+    LOGIN_ALERT: (data: { ip?: string; device?: string }) =>
         `[Segurança] Novo acesso detectado na sua conta Torex Journal`,
 
-    GENERAL_NOTIFICATION: (data: EmailTemplateData) => 
+    GENERAL_NOTIFICATION: (data: EmailTemplateData) =>
         data.subject || data.title || 'Notificação do Sistema • Torex Journal',
 
-    TRIAL_WELCOME: (data: { days?: number }) => 
+    TRIAL_WELCOME: (data: { days?: number }) =>
         `🎁 Presente Exclusivo: Seus ${data.days || 14} dias de Plano Premium estão ativos!`,
 
-    PAYMENT_INITIATED: (data: { amount?: string; reference?: string }) => 
+    PAYMENT_INITIATED: (data: { amount?: string; reference?: string }) =>
         `Confirmação de Pagamento Pendente (${data.amount ? `${data.amount} MT` : ''}) • Torex Journal`,
 
-    PAYMENT_SUCCESS: (data: { plan?: string }) => 
+    PAYMENT_SUCCESS: (data: { plan?: string }) =>
         `Pagamento Aprovado: Sua assinatura ${data.plan || 'Torex Journal'} está ativa!`,
 
-    PAYMENT_FAILED: (data: { reference?: string }) => 
+    PAYMENT_FAILED: (data: { reference?: string }) =>
         `Atenção: Falha no processamento do seu pagamento • Torex Journal`,
 
-    MT5_STATUS: (data: { status?: 'CONNECTED' | 'DISCONNECTED'; mt5Id?: string }) => 
-        data.status === 'CONNECTED' 
-            ? `🟢 Terminal MT5 Conectado com Sucesso (${data.mt5Id || ''}) • Torex Journal` 
+    MT5_STATUS: (data: { status?: 'CONNECTED' | 'DISCONNECTED'; mt5Id?: string }) =>
+        data.status === 'CONNECTED'
+            ? `🟢 Terminal MT5 Conectado com Sucesso (${data.mt5Id || ''}) • Torex Journal`
             : `🔴 Atenção: Terminal MT5 Desconectado (${data.mt5Id || ''}) • Torex Journal`,
 
-    TRADE_IMPORTED: (data: { count?: number }) => 
+    TRADE_IMPORTED: (data: { count?: number }) =>
         `📊 Sincronização Concluída: ${data.count || 0} operações registradas • Torex Journal`,
 
-    SYSTEM_ALERT: (data: { title?: string; type?: string; subject?: string }) => 
+    SYSTEM_ALERT: (data: { title?: string; type?: string; subject?: string }) =>
         data.subject || data.title || 'Alerta Operacional • Torex Journal',
 
-    WEEKLY_SUMMARY: (data: { period?: { start: string; end: string } }) => 
+    WEEKLY_SUMMARY: (data: { period?: { start: string; end: string } }) =>
         `📈 Seu Relatório Semanal de Performance • Torex Journal`
 };
 
@@ -584,8 +584,8 @@ export const Templates = {
                 </table>
             </div>
 
-            ${isConnected ? 
-                '<p>Seus trades e histórico estão sendo transmitidos e catalogados em tempo real na sua dashboard.</p>' : 
+            ${isConnected ?
+                '<p>Seus trades e histórico estão sendo transmitidos e catalogados em tempo real na sua dashboard.</p>' :
                 '<p>Para retomar a sincronização automática, certifique-se de que o seu terminal MetaTrader 5 está aberto e com o Expert Advisor (EA) do Torex Journal ativo.</p>'
             }
             
@@ -600,7 +600,7 @@ export const Templates = {
         const now = new Date();
         const hasStats = data.profit !== undefined;
         const profitColor = (data.profit || 0) >= 0 ? '#047857' : '#BE123C';
-        
+
         const content = `
             <div class="badge">SINCRONIZAÇÃO CONCLUÍDA</div>
             <h1 class="h1-title">Resumo da Importação de Trades</h1>
