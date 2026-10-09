@@ -32,6 +32,10 @@ import { PaymentModule } from '../payment/payment.module';
 import { EmailModule } from '../email/email.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 
+import { Mt5WorkerController } from './worker/mt5-worker.controller';
+import { Mt5WorkerService } from './worker/mt5-worker.service';
+import { WorkerAuthGuard } from './worker/worker-auth.guard';
+
 @Module({
     imports: [
         TypeOrmModule.forFeature([AccountEntity, PositionEntity, TradeEntity, TradeHistoryEntity, CloudInstanceEntity, ImportLog]),
@@ -60,8 +64,20 @@ import { DashboardModule } from '../dashboard/dashboard.module';
             }),
         }),
     ],
-    controllers: [Mt5Controller, ImportController],
-    providers: [Mt5Service, Mt5Gateway, Mt5Processor, TradeImportProcessor, BehavioralProcessor, Mt5TcpServer, Mt5RedisSubscriber, Mt5InstanceService, ReportParserService],
-    exports: [Mt5Service, Mt5InstanceService]
+    controllers: [Mt5Controller, ImportController, Mt5WorkerController],
+    providers: [
+        Mt5Service,
+        Mt5Gateway,
+        Mt5Processor,
+        TradeImportProcessor,
+        BehavioralProcessor,
+        Mt5TcpServer,
+        Mt5RedisSubscriber,
+        Mt5InstanceService,
+        ReportParserService,
+        Mt5WorkerService,
+        WorkerAuthGuard
+    ],
+    exports: [Mt5Service, Mt5InstanceService, Mt5WorkerService]
 })
 export class Mt5Module { }

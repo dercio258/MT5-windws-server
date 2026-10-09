@@ -11,6 +11,11 @@ import { PlanTier } from '../payment/plan-permission.service';
 
 import { Mt5TcpServer } from '../mt5-tcp.server';
 
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AccountEntity } from '../account/account.entity';
+import { Mt5WorkerService, WorkerTaskType } from './worker/mt5-worker.service';
+
 @Controller('mt5')
 export class Mt5Controller {
     private readonly logger = new Logger(Mt5Controller.name);
@@ -19,7 +24,10 @@ export class Mt5Controller {
         private readonly mt5Service: Mt5Service,
         @InjectQueue('mt5-data') private mt5Queue: Queue,
         private readonly mt5TcpServer: Mt5TcpServer,
-        private readonly mt5InstanceService: Mt5InstanceService
+        private readonly mt5InstanceService: Mt5InstanceService,
+        private readonly mt5WorkerService: Mt5WorkerService,
+        @InjectRepository(AccountEntity)
+        private readonly accountRepo: Repository<AccountEntity>,
     ) { }
 
     @Get('import-history')
@@ -99,17 +107,83 @@ export class Mt5Controller {
         return 'pong';
     }
 
+    @Get('worker/status')
+    @UseGuards(JwtAuthGuard)
+    async getWorkerStatus() {
+        return {
+            workers: this.mt5WorkerService.getWorkerStatus(),
+            pendingTasks: this.mt5WorkerService.getPendingTasks().length
+        };
+    }
+
     @Post('cloud/connect')
     @UseGuards(JwtAuthGuard, PlanGuard)
     @RequirePlan(PlanTier.PREMIUM)
     async connectCloud(@Body() body: { login: string, pass: string, server: string }, @Req() req) {
-        return this.mt5InstanceService.startInstance(req.user.id, body.login, body.pass, body.server);
+        // 1. Ensure user has an account record in database
+        let account = await this.accountRepo.findOne({ where: { mt5Id: body.login } });
+        if (!account) {
+            account = this.accountRepo.create({
+                userId: req.user.id,
+                mt5Id: body.login,
+                broker: body.server,
+                name: `MT5 ${body.login}`,
+                isConnected: false,
+                balance: 0,
+                equity: 0
+            });
+            await this.accountRepo.save(account);
+        } else if (!account.userId) {
+            account.userId = req.user.id;
+            await this.accountRepo.save(account);
+        }
+
+        // 2. Dispatch task for the Python Worker on Windows Server
+        const numId = parseInt(body.login.replace(/\D/g, ''), 10) || 1;
+        const task = this.mt5WorkerService.createAccountTask(
+            WorkerTaskType.START_ACCOUNT,
+            body.login,
+            body.server,
+            body.pass,
+            numId
+        );
+
+        // 3. Optional local instance startup if configured
+        let localInstance = null;
+        try {
+            localInstance = await this.mt5InstanceService.startInstance(req.user.id, body.login, body.pass, body.server);
+        } catch (e) {
+            this.logger.log(`Mt5InstanceService local não ativo (${e.message}). Tarefa enviada ao MT5 Worker.`);
+        }
+
+        return {
+            success: true,
+            message: 'Solicitação de conexão enviada com sucesso! O worker está iniciando a sincronização.',
+            taskId: task.id,
+            accountId: account.id,
+            instance: localInstance
+        };
     }
 
     @Post('cloud/disconnect')
     @UseGuards(JwtAuthGuard, PlanGuard)
     @RequirePlan(PlanTier.PREMIUM)
     async disconnectCloud(@Body() body: { login: string }, @Req() req) {
-        return this.mt5InstanceService.stopInstance(req.user.id, body.login);
+        const numId = parseInt(body.login.replace(/\D/g, ''), 10) || 1;
+        this.mt5WorkerService.createAccountTask(
+            WorkerTaskType.STOP_ACCOUNT,
+            body.login,
+            '',
+            undefined,
+            numId
+        );
+
+        try {
+            await this.mt5InstanceService.stopInstance(req.user.id, body.login);
+        } catch (e) {
+            // ignore local error
+        }
+
+        return { success: true, message: 'Terminal desconectado' };
     }
 }
